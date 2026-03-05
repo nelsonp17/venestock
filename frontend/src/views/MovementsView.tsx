@@ -183,6 +183,11 @@ function MovementModal({ isOpen, onClose, onSave, productos }: {
         const total_usd = (selectedProduct.precio_ref_usd * (formData.cantidad || 0));
         const total_bs = total_usd * rate;
 
+        // Stock validation
+        if (formData.tipo === "SALIDA" && (formData.cantidad || 0) > selectedProduct.stock) {
+            return alert(`Error: No hay suficiente stock. Disponible: ${selectedProduct.stock}`);
+        }
+
         try {
             await invoke("record_movement", {
                 mov: {
@@ -254,6 +259,15 @@ function MovementModal({ isOpen, onClose, onSave, productos }: {
                                 <div className="flex flex-col">
                                     <span className="text-xs font-bold text-primary uppercase">Seleccionado:</span>
                                     <span className="text-sm font-medium">{selectedProduct.nombre}</span>
+                                    <div className="flex items-center space-x-2 mt-0.5">
+                                        <span className="text-[10px] text-muted-foreground uppercase font-bold">Stock actual:</span>
+                                        <span className={cn(
+                                            "text-[10px] font-bold px-1.5 rounded",
+                                            selectedProduct.stock > 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                                        )}>
+                                            {selectedProduct.stock} unidades
+                                        </span>
+                                    </div>
                                 </div>
                                 <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded font-mono font-bold">
                                     {selectedProduct.codigo}
