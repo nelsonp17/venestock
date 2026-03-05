@@ -205,6 +205,86 @@ async fn save_export_file(app: tauri::AppHandle, filename: String, base64_data: 
     Ok(downloads_dir.to_string_lossy().to_string())
 }
 
+#[tauri::command]
+async fn export_data(state: State<'_, AppState>) -> Result<serde_json::Value, String> {
+    let pool = &state.db;
+
+    let productos: Vec<Producto> = sqlx::query_as("SELECT * FROM productos")
+        .fetch_all(pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let movimientos: Vec<Movimiento> = sqlx::query_as("SELECT * FROM movimientos")
+        .fetch_all(pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let tasas: Vec<Tasa> = sqlx::query_as("SELECT * FROM tasas")
+        .fetch_all(pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(serde_json::json!({
+        "productos": productos,
+        "movimientos": movimientos,
+        "tasas": tasas
+    }))
+}
+
+#[tauri::command]
+async fn import_data(state: State<'_, AppState>, productos: Vec<Producto>, movimientos: Vec<Movimiento>) -> Result<(), String> {
+    let mut tx = state.db.begin().await.map_err(|e| e.to_string())?;
+
+    for prod in productos {
+        sqlx::query("INSERT OR REPLACE INTO productos (id, codigo, barras, nombre, descripcion, precio_ref_usd, precio_bs, categoria, subcategoria, stock, price_per_dolar) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+            .bind(prod.id)
+            .bind(prod.codigo)
+            .bind(prod.barras)
+            .bind(prod.nombre)
+            .bind(prod.descripcion)
+            .bind(prod.precio_ref_usd)
+            .bind(prod.precio_bs)
+            .bind(prod.categoria)
+            .bind(prod.subcategoria)
+            .bind(prod.stock)
+            .bind(prod.price_per_dolar)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+
+    for mov in movimientos {
+         sqlx::query("INSERT OR REPLACE INTO movimientos (id, producto_id, tipo, cantidad, tasa_momento, total_usd, total_bs, price_per_dolar, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+            .bind(mov.id)
+            .bind(mov.producto_id)
+            .bind(mov.tipo)
+            .bind(mov.cantidad)
+            .bind(mov.tasa_momento)
+            .bind(mov.total_usd)
+            .bind(mov.total_bs)
+            .bind(mov.price_per_dolar)
+            .bind(mov.fecha)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+
+    tx.commit().await.map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn clear_database(state: State<'_, AppState>) -> Result<(), String> {
+    let mut tx = state.db.begin().await.map_err(|e| e.to_string())?;
+
+    sqlx::query("DELETE FROM movimientos").execute(&mut *tx).await.map_err(|e| e.to_string())?;
+    sqlx::query("DELETE FROM productos").execute(&mut *tx).await.map_err(|e| e.to_string())?;
+    sqlx::query("DELETE FROM tasas").execute(&mut *tx).await.map_err(|e| e.to_string())?;
+
+    tx.commit().await.map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -227,7 +307,10 @@ pub fn run() {
             get_stats,
             get_movements,
             record_movement,
-            save_export_file
+            save_export_file,
+            export_data,
+            import_data,
+            clear_database
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

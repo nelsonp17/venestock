@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Plus, Search, Edit2, Trash2, Calculator, Barcode, FileText, FileSpreadsheet } from "lucide-react";
-import { cn, formatCurrency } from "../lib/utils";
+import { formatCurrency } from "../lib/utils";
 import { ProductModal } from "./ProductModal.tsx";
 import { LabelModal } from "./LabelModal.tsx";
 import { RecalculateModal } from "./RecalculateModal.tsx";

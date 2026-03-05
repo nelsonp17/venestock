@@ -4,6 +4,7 @@ import { TasaWidget } from "./components/TasaWidget";
 import { cn, formatCurrency } from "./lib/utils";
 import { InventoryView } from "./views/InventoryView";
 import { MovementsView } from "./views/MovementsView";
+import { DatabaseView } from "./views/DatabaseView";
 import { invoke } from "@tauri-apps/api/core";
 
 function Dashboard({ active }: { active: boolean }) {
@@ -65,6 +66,9 @@ function App() {
         </div>
         <div className={cn("transition-all duration-300", activeTab === "movements" ? "block" : "hidden")}>
           <MovementsView active={activeTab === "movements"} />
+        </div>
+        <div className={cn("transition-all duration-300", activeTab === "database" ? "block" : "hidden")}>
+          <DatabaseView active={activeTab === "database"} />
         </div>
       </main>
 
