@@ -32,6 +32,18 @@ export function InventoryView({ active }: { active?: boolean }) {
         }
     };
 
+    const handleDeleteProduct = async (id: number, nombre: string) => {
+        if (!confirm(`¿Está seguro que desea eliminar el producto "${nombre}"?\nEsta acción no se puede deshacer y podría afectar el historial de movimientos si no hace limpieza de base de datos.`)) return;
+
+        try {
+            await invoke("delete_producto", { id });
+            await fetchProductos();
+        } catch (error) {
+            console.error("Error deleting product:", error);
+            alert("Error al eliminar el producto: " + error);
+        }
+    };
+
     const handleRecalculate = async (tasa: number) => {
         try {
             await invoke("recalculate_prices", { tasa });
@@ -226,7 +238,9 @@ export function InventoryView({ active }: { active?: boolean }) {
                                                 className="p-1.5 text-muted-foreground hover:text-primary transition-colors">
                                                 <Barcode size={16} />
                                             </button>
-                                            <button className="p-1.5 text-muted-foreground hover:text-destructive transition-colors">
+                                            <button
+                                                onClick={() => handleDeleteProduct(p.id!, p.nombre)}
+                                                className="p-1.5 text-muted-foreground hover:text-destructive transition-colors">
                                                 <Trash2 size={16} />
                                             </button>
                                         </div>

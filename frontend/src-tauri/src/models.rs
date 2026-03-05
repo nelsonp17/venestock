@@ -37,3 +37,16 @@ pub struct Movimiento {
     pub price_per_dolar: f64,
     pub fecha: Option<NaiveDateTime>,
 }
+
+#[derive(Debug, Serialize, Deserialize, FromRow, Clone)]
+pub struct Categoria {
+    pub id: Option<i32>,
+    pub nombre: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, FromRow, Clone)]
+pub struct Subcategoria {
+    pub id: Option<i32>,
+    pub nombre: String,
+    pub categoria_id: i32,
+}

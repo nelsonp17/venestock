@@ -159,12 +159,18 @@ function MovementModal({ isOpen, onClose, onSave, productos }: {
         const fetchTasa = async () => {
             try {
                 const tasaObj: any = await invoke("get_tasa_actual");
-                setFormData(prev => ({
-                    ...prev,
+                setFormData({
+                    producto_id: undefined,
+                    tipo: "ENTRADA",
+                    cantidad: 1,
                     tasa_momento: tasaObj.valor,
                     price_per_dolar: tasaObj.valor,
+                    total_usd: 0,
+                    total_bs: 0,
                     fecha: new Date().toISOString().slice(0, 16)
-                }));
+                });
+                setSearchQuery("");
+                setShowResults(false);
             } catch (e) {
                 console.error(e);
             }
@@ -179,7 +185,7 @@ function MovementModal({ isOpen, onClose, onSave, productos }: {
         const selectedProduct = productos.find(p => p.id === formData.producto_id);
         if (!selectedProduct) return;
 
-        const rate = formData.price_per_dolar || 0;
+        const rate = parseFloat(formData.price_per_dolar as any) || 0;
         const total_usd = (selectedProduct.precio_ref_usd * (formData.cantidad || 0));
         const total_bs = total_usd * rate;
 
@@ -189,12 +195,19 @@ function MovementModal({ isOpen, onClose, onSave, productos }: {
         }
 
         try {
+            // Rust NaiveDateTime expects format with seconds, e.g. YYYY-MM-DDTHH:mm:ss
+            let formattedFecha = formData.fecha || new Date().toISOString().slice(0, 16);
+            if (formattedFecha.length === 16) {
+                formattedFecha += ":00";
+            }
+
             await invoke("record_movement", {
                 mov: {
                     ...formData,
                     price_per_dolar: rate,
                     total_usd,
-                    total_bs
+                    total_bs,
+                    fecha: formattedFecha
                 }
             });
             onSave();
@@ -304,10 +317,10 @@ function MovementModal({ isOpen, onClose, onSave, productos }: {
                             <label className="text-[10px] font-bold uppercase text-muted-foreground">Tasa de Cambio</label>
                             <div className="relative">
                                 <input
-                                    type="number" step="0.01" required
+                                    type="number" step="any" required
                                     className="w-full px-3 py-1.5 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 font-bold"
                                     value={formData.price_per_dolar}
-                                    onChange={e => setFormData({ ...formData, price_per_dolar: parseFloat(e.target.value) })}
+                                    onChange={e => setFormData({ ...formData, price_per_dolar: e.target.value as any })}
                                 />
                                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">Bs/$</span>
                             </div>

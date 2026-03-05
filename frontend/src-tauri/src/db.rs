@@ -28,5 +28,24 @@ pub async fn init_db(app_handle: &AppHandle) -> Result<SqlitePool, Box<dyn std::
         .execute(&pool)
         .await;
 
+    // Manual migration: create categorias table if it doesn't exist
+    let _ = sqlx::query(
+        "CREATE TABLE IF NOT EXISTS categorias (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre TEXT UNIQUE NOT NULL
+        )"
+    ).execute(&pool).await;
+
+    // Manual migration: create subcategorias table if it doesn't exist
+    let _ = sqlx::query(
+        "CREATE TABLE IF NOT EXISTS subcategorias (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre TEXT NOT NULL,
+            categoria_id INTEGER NOT NULL,
+            FOREIGN KEY(categoria_id) REFERENCES categorias(id) ON DELETE CASCADE,
+            UNIQUE(nombre, categoria_id)
+        )"
+    ).execute(&pool).await;
+
     Ok(pool)
 }

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { X, Save } from "lucide-react";
 import { Producto } from "../types";
+import { SearchableSelect, SelectOption } from "../components/SearchableSelect";
 
 interface ProductModalProps {
     isOpen: boolean;
@@ -9,6 +10,9 @@ interface ProductModalProps {
     onSave: () => void;
     product: Producto | null;
 }
+
+interface Categoria { id: number; nombre: string; }
+interface Subcategoria { id: number; nombre: string; categoria_id: number; }
 
 export function ProductModal({ isOpen, onClose, onSave, product }: ProductModalProps) {
     const [formData, setFormData] = useState<Producto>({
@@ -26,7 +30,11 @@ export function ProductModal({ isOpen, onClose, onSave, product }: ProductModalP
     });
 
     const [tasa, setTasa] = useState(1.0);
+    const [categorias, setCategorias] = useState<Categoria[]>([]);
+    const [subcategorias, setSubcategorias] = useState<Subcategoria[]>([]);
+    const [filteredSubs, setFilteredSubs] = useState<Subcategoria[]>([]);
 
+    // Fetch tasa on open
     useEffect(() => {
         const fetchTasa = async () => {
             try {
@@ -39,6 +47,23 @@ export function ProductModal({ isOpen, onClose, onSave, product }: ProductModalP
         if (isOpen) fetchTasa();
     }, [isOpen]);
 
+    // Fetch categorias and subcategorias on open
+    useEffect(() => {
+        if (!isOpen) return;
+        const fetchAll = async () => {
+            try {
+                const cats = await invoke<Categoria[]>("get_categorias");
+                const subs = await invoke<Subcategoria[]>("get_subcategorias", { categoria_id: null });
+                setCategorias(cats);
+                setSubcategorias(subs);
+            } catch (e) {
+                console.error("Error fetching categorias:", e);
+            }
+        };
+        fetchAll();
+    }, [isOpen]);
+
+    // Update form when product or tasa changes
     useEffect(() => {
         if (product) {
             setFormData(product);
@@ -59,18 +84,37 @@ export function ProductModal({ isOpen, onClose, onSave, product }: ProductModalP
         }
     }, [product, isOpen, tasa]);
 
-    const handlePriceUSDChange = (val: number) => {
+    // Filter subcategorias when categoria changes
+    useEffect(() => {
+        const selectedCat = categorias.find(c => c.nombre === formData.categoria);
+        if (selectedCat) {
+            setFilteredSubs(subcategorias.filter(s => s.categoria_id === selectedCat.id));
+        } else {
+            setFilteredSubs(subcategorias);
+        }
+    }, [formData.categoria, subcategorias, categorias]);
+
+    const handlePriceUSDChange = (val: string) => {
+        const numVal = parseFloat(val) || 0;
         setFormData({
             ...formData,
-            precio_ref_usd: val,
-            precio_bs: parseFloat((val * tasa).toFixed(2))
+            precio_ref_usd: val as any,
+            precio_bs: parseFloat((numVal * tasa).toFixed(2))
         });
+    };
+
+    const handleCategoriaChange = (val: string) => {
+        // When category changes, clear subcategory
+        setFormData({ ...formData, categoria: val, subcategoria: "" });
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const finalData = { ...formData };
+            const finalData = {
+                ...formData,
+                precio_ref_usd: typeof formData.precio_ref_usd === 'string' ? (parseFloat(formData.precio_ref_usd) || 0) : formData.precio_ref_usd
+            };
 
             // Autogenerate barcode if missing
             if (!finalData.barras) {
@@ -91,6 +135,10 @@ export function ProductModal({ isOpen, onClose, onSave, product }: ProductModalP
 
     if (!isOpen) return null;
 
+    const catOptions: SelectOption[] = categorias.map(c => ({ value: c.nombre, label: c.nombre }));
+    const subOptions: SelectOption[] = filteredSubs.map(s => ({ value: s.nombre, label: s.nombre }));
+    const selectedCat = categorias.find(c => c.nombre === formData.categoria);
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
             <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
@@ -108,7 +156,7 @@ export function ProductModal({ isOpen, onClose, onSave, product }: ProductModalP
                             required
                             value={formData.codigo}
                             onChange={e => setFormData({ ...formData, codigo: e.target.value })}
-                            className="w-full px-4 py-2 border border-border rounded-xl focus:ring-2 focus:ring-primary/20"
+                            className="w-full px-4 py-2 border border-border rounded-xl focus:ring-2 focus:ring-primary/20 outline-none"
                             placeholder="PROD-001"
                         />
                     </div>
@@ -119,7 +167,7 @@ export function ProductModal({ isOpen, onClose, onSave, product }: ProductModalP
                             required
                             value={formData.nombre}
                             onChange={e => setFormData({ ...formData, nombre: e.target.value })}
-                            className="w-full px-4 py-2 border border-border rounded-xl focus:ring-2 focus:ring-primary/20"
+                            className="w-full px-4 py-2 border border-border rounded-xl focus:ring-2 focus:ring-primary/20 outline-none"
                             placeholder="Ej. Harina Pan 1kg"
                         />
                     </div>
@@ -128,10 +176,10 @@ export function ProductModal({ isOpen, onClose, onSave, product }: ProductModalP
                         <div className="space-y-2">
                             <label className="text-sm font-semibold text-primary">Precio Ref ($)</label>
                             <input
-                                type="number" step="0.01" required
+                                type="number" step="any" required
                                 value={formData.precio_ref_usd}
-                                onChange={e => handlePriceUSDChange(parseFloat(e.target.value))}
-                                className="w-full px-4 py-2 border border-primary/30 rounded-xl focus:ring-2 focus:ring-primary/20 bg-primary/5 font-bold"
+                                onChange={e => handlePriceUSDChange(e.target.value)}
+                                className="w-full px-4 py-2 border border-primary/30 rounded-xl focus:ring-2 focus:ring-primary/20 bg-primary/5 font-bold outline-none"
                             />
                         </div>
                         <div className="space-y-2">
@@ -140,7 +188,7 @@ export function ProductModal({ isOpen, onClose, onSave, product }: ProductModalP
                                 type="number" required
                                 value={formData.stock}
                                 onChange={e => setFormData({ ...formData, stock: parseInt(e.target.value) })}
-                                className="w-full px-4 py-2 border border-border rounded-xl focus:ring-2 focus:ring-primary/20"
+                                className="w-full px-4 py-2 border border-border rounded-xl focus:ring-2 focus:ring-primary/20 outline-none"
                             />
                         </div>
                     </div>
@@ -148,18 +196,21 @@ export function ProductModal({ isOpen, onClose, onSave, product }: ProductModalP
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <label className="text-sm font-semibold">Categoría</label>
-                            <input
+                            <SearchableSelect
+                                options={catOptions}
                                 value={formData.categoria || ""}
-                                onChange={e => setFormData({ ...formData, categoria: e.target.value })}
-                                className="w-full px-4 py-2 border border-border rounded-xl focus:ring-2 focus:ring-primary/20"
+                                onChange={handleCategoriaChange}
+                                placeholder="Seleccionar categoría..."
                             />
                         </div>
                         <div className="space-y-2">
                             <label className="text-sm font-semibold">Subcategoría</label>
-                            <input
+                            <SearchableSelect
+                                options={subOptions}
                                 value={formData.subcategoria || ""}
-                                onChange={e => setFormData({ ...formData, subcategoria: e.target.value })}
-                                className="w-full px-4 py-2 border border-border rounded-xl focus:ring-2 focus:ring-primary/20"
+                                onChange={(val) => setFormData({ ...formData, subcategoria: val })}
+                                placeholder={selectedCat ? "Seleccionar..." : "Primero elige categoría"}
+                                disabled={subOptions.length === 0}
                             />
                         </div>
                     </div>

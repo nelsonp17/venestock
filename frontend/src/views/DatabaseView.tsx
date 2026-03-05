@@ -15,11 +15,11 @@ export function DatabaseView({ active }: { active: boolean }) {
 
             // Helper to convert array of objects to CSV
             const toCSV = (arr: any[]) => {
-                if (arr.length === 0) return "";
+                if (!arr || arr.length === 0) return "";
                 const headers = Object.keys(arr[0]).join(",");
                 const rows = arr.map(obj =>
                     Object.values(obj).map(val =>
-                        typeof val === 'string' ? `"${val.replace(/"/g, '""')}"` : val
+                        typeof val === 'string' ? `"${val.replace(/"/g, '""')}"` : val ?? ""
                     ).join(",")
                 ).join("\n");
                 return `${headers}\n${rows}`;
@@ -27,9 +27,16 @@ export function DatabaseView({ active }: { active: boolean }) {
 
             const productosCSV = toCSV(data.productos);
             const movimientosCSV = toCSV(data.movimientos);
+            const categoriasCSV = toCSV(data.categorias);
+            const subcategoriasCSV = toCSV(data.subcategorias);
 
-            // Create a downloadable blob
-            const fullContent = `--- PRODUCTOS ---\n${productosCSV}\n\n--- MOVIMIENTOS ---\n${movimientosCSV}`;
+            const fullContent = [
+                `--- PRODUCTOS ---\n${productosCSV}`,
+                `--- MOVIMIENTOS ---\n${movimientosCSV}`,
+                `--- CATEGORIAS ---\n${categoriasCSV}`,
+                `--- SUBCATEGORIAS ---\n${subcategoriasCSV}`,
+            ].join("\n\n");
+
             const blob = new Blob([fullContent], { type: 'text/csv' });
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -60,7 +67,7 @@ export function DatabaseView({ active }: { active: boolean }) {
                     if (lines.length < 2) return [];
 
                     const headers = lines[0].split(',').map(h => h.trim());
-                    const numericalFields = ['id', 'producto_id', 'cantidad', 'tasa_momento', 'total_usd', 'total_bs', 'price_per_dolar', 'precio_ref_usd', 'precio_bs', 'stock'];
+                    const numericalFields = ['id', 'producto_id', 'categoria_id', 'cantidad', 'tasa_momento', 'total_usd', 'total_bs', 'price_per_dolar', 'precio_ref_usd', 'precio_bs', 'stock'];
 
                     return lines.slice(1).map(line => {
                         const values = line.split(',');
@@ -84,21 +91,27 @@ export function DatabaseView({ active }: { active: boolean }) {
                     });
                 };
 
-                // Split by the explicit section headers
-                const productosPart = text.split('--- PRODUCTOS ---')[1]?.split('---')[0] || "";
-                const movimientosPart = text.split('--- MOVIMIENTOS ---')[1]?.split('---')[0] || "";
+                // Extract sections from file
+                const getSection = (text: string, name: string) => {
+                    return text.split(`--- ${name} ---`)[1]?.split(/--- \w+ ---/)[0] ?? "";
+                };
 
-                const productos = parseSection(productosPart);
-                const movimientos = parseSection(movimientosPart);
+                const productos = parseSection(getSection(text, "PRODUCTOS"));
+                const movimientos = parseSection(getSection(text, "MOVIMIENTOS"));
+                const categorias = parseSection(getSection(text, "CATEGORIAS"));
+                const subcategorias = parseSection(getSection(text, "SUBCATEGORIAS"));
 
-                console.log("Importing:", { productos, movimientos });
+                console.log("Importing:", { productos, movimientos, categorias, subcategorias });
 
-                if (productos.length === 0 && movimientos.length === 0) {
+                if (productos.length === 0 && movimientos.length === 0 && categorias.length === 0) {
                     throw new Error("No se encontraron datos válidos en el archivo.");
                 }
 
-                await invoke("import_data", { productos, movimientos });
-                setStatus({ type: 'success', message: `Importación exitosa: ${productos.length} productos y ${movimientos.length} movimientos.` });
+                await invoke("import_data", { productos, movimientos, categorias, subcategorias });
+                setStatus({
+                    type: 'success',
+                    message: `Importación exitosa: ${productos.length} productos, ${movimientos.length} movimientos, ${categorias.length} categorías y ${subcategorias.length} subcategorías.`
+                });
             } catch (err) {
                 console.error("Import error:", err);
                 setStatus({ type: 'error', message: `Error al importar: ${err}` });
@@ -150,7 +163,7 @@ export function DatabaseView({ active }: { active: boolean }) {
                         </div>
                         <h3 className="text-xl font-bold mb-2">Exportar CSV</h3>
                         <p className="text-sm text-muted-foreground mb-6">
-                            Descarga una copia de seguridad completa de tus productos y movimientos en formato CSV compatible con Excel.
+                            Descarga una copia de seguridad completa de tus productos, movimientos, categorías y subcategorías en formato CSV.
                         </p>
                     </div>
                     <button
@@ -189,7 +202,7 @@ export function DatabaseView({ active }: { active: boolean }) {
                         </div>
                         <h3 className="text-xl font-bold mb-2 text-destructive">Limpiar Sistema</h3>
                         <p className="text-sm text-muted-foreground mb-6">
-                            Elimina por completo todos los productos, movimientos y registros. <span className="font-bold">Esta acción no se puede deshacer.</span>
+                            Elimina por completo todos los productos, movimientos, categorías y registros. <span className="font-bold">Esta acción no se puede deshacer.</span>
                         </p>
                     </div>
                     <button
@@ -212,8 +225,11 @@ export function DatabaseView({ active }: { active: boolean }) {
                         </div>
                         <div className="p-6">
                             <p className="text-muted-foreground mb-6 leading-relaxed">
-                                Esta acción borrará permanentemente todos los <span className="font-bold text-foreground">productos</span>,
-                                <span className="font-bold text-foreground"> movimientos</span> e <span className="font-bold text-foreground">historial de tasas</span> del sistema.
+                                Esta acción borrará permanentemente todos los <span className="font-bold text-foreground">productos</span>,{" "}
+                                <span className="font-bold text-foreground">movimientos</span>,{" "}
+                                <span className="font-bold text-foreground">categorías</span>,{" "}
+                                <span className="font-bold text-foreground">subcategorías</span> e{" "}
+                                <span className="font-bold text-foreground">historial de tasas</span> del sistema.
                                 No existe forma de recuperar esta información a menos que tengas un respaldo previo.
                             </p>
                             <div className="flex flex-col space-y-3">

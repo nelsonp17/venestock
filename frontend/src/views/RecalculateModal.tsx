@@ -146,7 +146,7 @@ export function RecalculateModal({ isOpen, onClose, onConfirm }: RecalculateModa
                                     </div>
                                     <div className="relative mt-auto">
                                         <input
-                                            type="number"
+                                            type="number" step="any"
                                             placeholder="0.00"
                                             value={customRate}
                                             onChange={(e) => setCustomRate(e.target.value)}

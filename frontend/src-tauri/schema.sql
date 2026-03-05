@@ -19,6 +19,19 @@ CREATE TABLE IF NOT EXISTS productos (
     price_per_dolar REAL NOT NULL DEFAULT 1.0
 );
 
+CREATE TABLE IF NOT EXISTS categorias (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre TEXT UNIQUE NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS subcategorias (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre TEXT NOT NULL,
+    categoria_id INTEGER NOT NULL,
+    FOREIGN KEY(categoria_id) REFERENCES categorias(id) ON DELETE CASCADE,
+    UNIQUE(nombre, categoria_id)
+);
+
 CREATE TABLE IF NOT EXISTS movimientos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     producto_id INTEGER NOT NULL,
