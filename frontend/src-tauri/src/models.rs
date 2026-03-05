@@ -14,6 +14,7 @@ pub struct Producto {
     pub categoria: Option<String>,
     pub subcategoria: Option<String>,
     pub stock: i32,
+    pub price_per_dolar: f64,
 }
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
@@ -33,5 +34,6 @@ pub struct Movimiento {
     pub tasa_momento: f64,
     pub total_usd: f64,
     pub total_bs: f64,
+    pub price_per_dolar: f64,
     pub fecha: Option<NaiveDateTime>,
 }

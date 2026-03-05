@@ -5,6 +5,9 @@ mod scraper;
 use models::{Producto, Tasa, Movimiento};
 use sqlx::SqlitePool;
 use tauri::{Manager, State};
+use base64::{Engine as _, engine::general_purpose};
+use std::fs;
+use tauri::path::BaseDirectory;
 
 struct AppState {
     db: SqlitePool,
@@ -25,7 +28,7 @@ async fn fetch_bcv_tasa() -> Result<scraper::TasaBCV, String> {
 
 #[tauri::command]
 async fn save_tasa(state: State<'_, AppState>, valor: f64, fuente: String) -> Result<Tasa, String> {
-    let now = chrono::Local::now().naive_local();
+    let now = chrono::Utc::now().naive_utc();
     sqlx::query("INSERT INTO tasas (valor, fecha, fuente) VALUES (?, ?, ?)")
         .bind(valor)
         .bind(now)
@@ -53,7 +56,7 @@ async fn get_productos(state: State<'_, AppState>) -> Result<Vec<Producto>, Stri
 #[tauri::command]
 async fn upsert_producto(state: State<'_, AppState>, mut producto: Producto) -> Result<Producto, String> {
     if let Some(id) = producto.id {
-        sqlx::query("UPDATE productos SET codigo=?, barras=?, nombre=?, descripcion=?, precio_ref_usd=?, precio_bs=?, categoria=?, subcategoria=?, stock=? WHERE id=?")
+        sqlx::query("UPDATE productos SET codigo=?, barras=?, nombre=?, descripcion=?, precio_ref_usd=?, precio_bs=?, categoria=?, subcategoria=?, stock=?, price_per_dolar=? WHERE id=?")
             .bind(&producto.codigo)
             .bind(&producto.barras)
             .bind(&producto.nombre)
@@ -63,12 +66,13 @@ async fn upsert_producto(state: State<'_, AppState>, mut producto: Producto) -> 
             .bind(&producto.categoria)
             .bind(&producto.subcategoria)
             .bind(producto.stock)
+            .bind(producto.price_per_dolar)
             .bind(id)
             .execute(&state.db)
             .await
             .map_err(|e| e.to_string())?;
     } else {
-        let result = sqlx::query("INSERT INTO productos (codigo, barras, nombre, descripcion, precio_ref_usd, precio_bs, categoria, subcategoria, stock) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        let result = sqlx::query("INSERT INTO productos (codigo, barras, nombre, descripcion, precio_ref_usd, precio_bs, categoria, subcategoria, stock, price_per_dolar) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
             .bind(&producto.codigo)
             .bind(&producto.barras)
             .bind(&producto.nombre)
@@ -78,6 +82,7 @@ async fn upsert_producto(state: State<'_, AppState>, mut producto: Producto) -> 
             .bind(&producto.categoria)
             .bind(&producto.subcategoria)
             .bind(producto.stock)
+            .bind(producto.price_per_dolar)
             .execute(&state.db)
             .await
             .map_err(|e| e.to_string())?;
@@ -92,7 +97,8 @@ async fn recalculate_prices(state: State<'_, AppState>, tasa: f64, ids: Option<V
     match ids {
         Some(list) => {
             for id in list {
-                sqlx::query("UPDATE productos SET precio_bs = precio_ref_usd * ? WHERE id = ?")
+                sqlx::query("UPDATE productos SET precio_bs = precio_ref_usd * ?, price_per_dolar = ? WHERE id = ?")
+                    .bind(tasa)
                     .bind(tasa)
                     .bind(id)
                     .execute(&state.db)
@@ -101,7 +107,8 @@ async fn recalculate_prices(state: State<'_, AppState>, tasa: f64, ids: Option<V
             }
         }
         None => {
-            sqlx::query("UPDATE productos SET precio_bs = precio_ref_usd * ?")
+            sqlx::query("UPDATE productos SET precio_bs = precio_ref_usd * ?, price_per_dolar = ?")
+                .bind(tasa)
                 .bind(tasa)
                 .execute(&state.db)
                 .await
@@ -123,18 +130,20 @@ async fn get_movements(state: State<'_, AppState>) -> Result<Vec<Movimiento>, St
 async fn record_movement(state: State<'_, AppState>, mut mov: Movimiento) -> Result<(), String> {
     let mut tx = state.db.begin().await.map_err(|e| e.to_string())?;
 
-    let now = chrono::Local::now().naive_local();
-    mov.fecha = Some(now);
+    let now = chrono::Utc::now().naive_utc();
+    let final_fecha = mov.fecha.unwrap_or(now);
+    mov.fecha = Some(final_fecha);
 
     // Insert movement
-    sqlx::query("INSERT INTO movimientos (producto_id, tipo, cantidad, tasa_momento, total_usd, total_bs, fecha) VALUES (?, ?, ?, ?, ?, ?, ?)")
+    sqlx::query("INSERT INTO movimientos (producto_id, tipo, cantidad, tasa_momento, total_usd, total_bs, price_per_dolar, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
         .bind(mov.producto_id)
         .bind(&mov.tipo)
         .bind(mov.cantidad)
         .bind(mov.tasa_momento)
         .bind(mov.total_usd)
         .bind(mov.total_bs)
-        .bind(now)
+        .bind(mov.price_per_dolar)
+        .bind(final_fecha)
         .execute(&mut *tx)
         .await
         .map_err(|e| e.to_string())?;
@@ -183,6 +192,19 @@ async fn get_stats(state: State<'_, AppState>) -> Result<Stats, String> {
     Ok(Stats { total_productos, stock_bajo, tasa_actual })
 }
 
+#[tauri::command]
+async fn save_export_file(app: tauri::AppHandle, filename: String, base64_data: String) -> Result<String, String> {
+    let downloads_dir = app.path().resolve(filename, BaseDirectory::Download)
+        .map_err(|e| e.to_string())?;
+
+    let bytes = general_purpose::STANDARD.decode(base64_data)
+        .map_err(|e| e.to_string())?;
+
+    fs::write(&downloads_dir, bytes).map_err(|e| e.to_string())?;
+
+    Ok(downloads_dir.to_string_lossy().to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -204,7 +226,8 @@ pub fn run() {
             recalculate_prices,
             get_stats,
             get_movements,
-            record_movement
+            record_movement,
+            save_export_file
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

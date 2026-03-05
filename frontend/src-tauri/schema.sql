@@ -15,7 +15,8 @@ CREATE TABLE IF NOT EXISTS productos (
     precio_bs REAL NOT NULL DEFAULT 0.0,
     categoria TEXT,
     subcategoria TEXT,
-    stock INTEGER NOT NULL DEFAULT 0
+    stock INTEGER NOT NULL DEFAULT 0,
+    price_per_dolar REAL NOT NULL DEFAULT 1.0
 );
 
 CREATE TABLE IF NOT EXISTS movimientos (
@@ -26,11 +27,12 @@ CREATE TABLE IF NOT EXISTS movimientos (
     tasa_momento REAL NOT NULL,
     total_usd REAL NOT NULL,
     total_bs REAL NOT NULL,
+    price_per_dolar REAL NOT NULL DEFAULT 1.0,
     fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(producto_id) REFERENCES productos(id)
 );
 
 -- Insert an initial rate if none exists
 INSERT INTO tasas (valor, fecha, fuente) 
-SELECT 1.0, datetime('now'), 'SISTEMA'
+SELECT 1.0, '2000-01-01 00:00:00', 'SISTEMA'
 WHERE NOT EXISTS (SELECT 1 FROM tasas);

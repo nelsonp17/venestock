@@ -36,12 +36,12 @@ export function Sidebar({ activeTab, onTabChange }: { activeTab: string, onTabCh
                 </ul>
             </nav>
 
-            <div className="p-4 border-t border-border">
+            {/* <div className="p-4 border-t border-border">
                 <button className="w-full flex items-center space-x-3 px-4 py-3 text-destructive hover:bg-destructive/10 rounded-lg transition-colors">
                     <LogOut size={20} />
                     <span className="font-medium">Salir</span>
                 </button>
-            </div>
+            </div> */}
         </div>
     );
 }

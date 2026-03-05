@@ -21,7 +21,8 @@ export function ProductModal({ isOpen, onClose, onSave, product }: ProductModalP
         precio_bs: 0.0,
         categoria: "",
         subcategoria: "",
-        stock: 0
+        stock: 0,
+        price_per_dolar: 1.0
     });
 
     const [tasa, setTasa] = useState(1.0);
@@ -52,7 +53,8 @@ export function ProductModal({ isOpen, onClose, onSave, product }: ProductModalP
                 precio_bs: tasa,
                 categoria: "",
                 subcategoria: "",
-                stock: 0
+                stock: 0,
+                price_per_dolar: tasa
             });
         }
     }, [product, isOpen, tasa]);
@@ -68,7 +70,18 @@ export function ProductModal({ isOpen, onClose, onSave, product }: ProductModalP
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            await invoke("upsert_producto", { producto: formData });
+            const finalData = { ...formData };
+
+            // Autogenerate barcode if missing
+            if (!finalData.barras) {
+                finalData.barras = finalData.codigo;
+            }
+
+            // Ensure price in Bs is calculated with latest tasa before saving
+            finalData.precio_bs = parseFloat((finalData.precio_ref_usd * tasa).toFixed(2));
+            finalData.price_per_dolar = tasa;
+
+            await invoke("upsert_producto", { producto: finalData });
             onSave();
             onClose();
         } catch (error) {
@@ -89,26 +102,15 @@ export function ProductModal({ isOpen, onClose, onSave, product }: ProductModalP
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-6 space-y-6">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <label className="text-sm font-semibold">Código Interno</label>
-                            <input
-                                required
-                                value={formData.codigo}
-                                onChange={e => setFormData({ ...formData, codigo: e.target.value })}
-                                className="w-full px-4 py-2 border border-border rounded-xl focus:ring-2 focus:ring-primary/20"
-                                placeholder="PROD-001"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-sm font-semibold">Código de Barras</label>
-                            <input
-                                value={formData.barras || ""}
-                                onChange={e => setFormData({ ...formData, barras: e.target.value })}
-                                className="w-full px-4 py-2 border border-border rounded-xl focus:ring-2 focus:ring-primary/20"
-                                placeholder="759..."
-                            />
-                        </div>
+                    <div className="space-y-2">
+                        <label className="text-sm font-semibold">Código Interno</label>
+                        <input
+                            required
+                            value={formData.codigo}
+                            onChange={e => setFormData({ ...formData, codigo: e.target.value })}
+                            className="w-full px-4 py-2 border border-border rounded-xl focus:ring-2 focus:ring-primary/20"
+                            placeholder="PROD-001"
+                        />
                     </div>
 
                     <div className="space-y-2">
@@ -122,7 +124,7 @@ export function ProductModal({ isOpen, onClose, onSave, product }: ProductModalP
                         />
                     </div>
 
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <label className="text-sm font-semibold text-primary">Precio Ref ($)</label>
                             <input
@@ -130,15 +132,6 @@ export function ProductModal({ isOpen, onClose, onSave, product }: ProductModalP
                                 value={formData.precio_ref_usd}
                                 onChange={e => handlePriceUSDChange(parseFloat(e.target.value))}
                                 className="w-full px-4 py-2 border border-primary/30 rounded-xl focus:ring-2 focus:ring-primary/20 bg-primary/5 font-bold"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-sm font-semibold">Precio Bs. (Auto)</label>
-                            <input
-                                type="number" step="0.01" required
-                                value={formData.precio_bs}
-                                onChange={e => setFormData({ ...formData, precio_bs: parseFloat(e.target.value) })}
-                                className="w-full px-4 py-2 border border-border rounded-xl focus:ring-2 focus:ring-primary/20 bg-secondary/20"
                             />
                         </div>
                         <div className="space-y-2">

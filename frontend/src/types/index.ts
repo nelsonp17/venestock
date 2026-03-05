@@ -9,6 +9,7 @@ export interface Producto {
     categoria: string | null;
     subcategoria: string | null;
     stock: number;
+    price_per_dolar: number;
 }
 
 export interface Tasa {
@@ -26,5 +27,6 @@ export interface Movimiento {
     tasa_momento: number;
     total_usd: number;
     total_bs: number;
+    price_per_dolar: number;
     fecha: string | null;
 }

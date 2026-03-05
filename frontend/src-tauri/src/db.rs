@@ -19,5 +19,14 @@ pub async fn init_db(app_handle: &AppHandle) -> Result<SqlitePool, Box<dyn std::
     let schema = include_str!("../schema.sql");
     sqlx::query(schema).execute(&pool).await?;
 
+    // Manual migration for price_per_dolar if it doesn't exist
+    let _ = sqlx::query("ALTER TABLE productos ADD COLUMN price_per_dolar REAL NOT NULL DEFAULT 1.0")
+        .execute(&pool)
+        .await;
+
+    let _ = sqlx::query("ALTER TABLE movimientos ADD COLUMN price_per_dolar REAL NOT NULL DEFAULT 1.0")
+        .execute(&pool)
+        .await;
+
     Ok(pool)
 }

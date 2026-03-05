@@ -6,21 +6,23 @@ import { InventoryView } from "./views/InventoryView";
 import { MovementsView } from "./views/MovementsView";
 import { invoke } from "@tauri-apps/api/core";
 
-// Placeholder views
-function Dashboard() {
+function Dashboard({ active }: { active: boolean }) {
   const [stats, setStats] = useState({ total_productos: 0, stock_bajo: 0, tasa_actual: 0 });
 
+  const fetchStats = async () => {
+    try {
+      const s: any = await invoke("get_stats");
+      setStats(s);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const s: any = await invoke("get_stats");
-        setStats(s);
-      } catch (e) {
-        console.error(e);
-      }
-    };
-    fetchStats();
-  }, []);
+    if (active) {
+      fetchStats();
+    }
+  }, [active]);
 
   return (
     <div className="p-8">
@@ -56,13 +58,13 @@ function App() {
 
       <main className="flex-1 overflow-auto">
         <div className={cn("transition-all duration-300", activeTab === "dashboard" ? "block" : "hidden")}>
-          <Dashboard />
+          <Dashboard active={activeTab === "dashboard"} />
         </div>
         <div className={cn("transition-all duration-300", activeTab === "inventory" ? "block" : "hidden")}>
-          <InventoryView />
+          <InventoryView active={activeTab === "inventory"} />
         </div>
         <div className={cn("transition-all duration-300", activeTab === "movements" ? "block" : "hidden")}>
-          <MovementsView />
+          <MovementsView active={activeTab === "movements"} />
         </div>
         <div className={cn("transition-all duration-300", activeTab === "settings" ? "block" : "hidden")}>
           <div className="p-8 text-center text-muted-foreground mt-20">

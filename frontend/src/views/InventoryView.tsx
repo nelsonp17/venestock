@@ -4,17 +4,19 @@ import { Plus, Search, Edit2, Trash2, Calculator, Barcode, FileText, FileSpreads
 import { cn, formatCurrency } from "../lib/utils";
 import { ProductModal } from "./ProductModal.tsx";
 import { LabelModal } from "./LabelModal.tsx";
+import { RecalculateModal } from "./RecalculateModal.tsx";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { Producto } from "../types";
 
-export function InventoryView() {
+export function InventoryView({ active }: { active?: boolean }) {
     const [productos, setProductos] = useState<Producto[]>([]);
     const [search, setSearch] = useState("");
     const [loading, setLoading] = useState(true);
     const [modalOpen, setModalOpen] = useState(false);
     const [labelOpen, setLabelOpen] = useState(false);
+    const [recalculateOpen, setRecalculateOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Producto | null>(null);
     const [selectedProduct, setSelectedProduct] = useState<Producto | null>(null);
 
@@ -30,57 +32,85 @@ export function InventoryView() {
         }
     };
 
-    const handleRecalculate = async () => {
+    const handleRecalculate = async (tasa: number) => {
         try {
-            const tasaObj: any = await invoke("get_tasa_actual");
-            if (confirm(`¿Recalcular precios de TODOS los productos usando la tasa actual de ${tasaObj.valor} Bs/$?`)) {
-                await invoke("recalculate_prices", { tasa: tasaObj.valor });
-                await fetchProductos();
-                alert("Precios actualizados con éxito");
-            }
+            await invoke("recalculate_prices", { tasa });
+            await fetchProductos();
+            // alert("Precios actualizados con éxito");
         } catch (error) {
-            alert("Error al recalcular: " + error);
+            throw error; // Let the modal handle it
         }
     };
 
-    const exportToPDF = () => {
-        const doc = new jsPDF();
-        doc.text("Reporte de Inventario - SGM Venestock", 14, 15);
+    const exportToPDF = async () => {
+        try {
+            console.log("Iniciando exportación a PDF (Backend)...");
+            const doc = new jsPDF();
+            doc.text("Reporte de Inventario - SGM Venestock", 14, 15);
 
-        const tableData = filtered.map(p => [
-            p.codigo,
-            p.nombre,
-            formatCurrency(p.precio_ref_usd, "USD"),
-            formatCurrency(p.precio_bs, "BS"),
-            p.stock.toString()
-        ]);
+            const tableData = filtered.map(p => [
+                p.codigo,
+                p.nombre,
+                formatCurrency(p.precio_ref_usd, "USD"),
+                formatCurrency(p.precio_bs, "BS"),
+                p.stock.toString()
+            ]);
 
-        autoTable(doc, {
-            head: [["Código", "Nombre", "Precio ($)", "Precio (Bs)", "Stock"]],
-            body: tableData,
-            startY: 20,
-        });
+            autoTable(doc, {
+                head: [["Código", "Nombre", "Precio ($)", "Precio (Bs)", "Stock"]],
+                body: tableData,
+                startY: 20,
+            });
 
-        doc.save(`inventario_${new Date().toISOString().split('T')[0]}.pdf`);
+            const dataUri = doc.output("datauristring");
+            const base64 = dataUri.split(",")[1];
+            const fileName = `inventario_${new Date().toISOString().split('T')[0]}.pdf`;
+
+            const path: string = await invoke("save_export_file", {
+                filename: fileName,
+                base64Data: base64
+            });
+
+            alert(`PDF guardado con éxito en su carpeta de Descargas:\n${path}`);
+        } catch (error) {
+            console.error("Error al exportar PDF:", error);
+            alert("No se pudo generar el PDF. Error: " + error);
+        }
     };
 
-    const exportToExcel = () => {
-        const worksheet = XLSX.utils.json_to_sheet(filtered.map(p => ({
-            Código: p.codigo,
-            Nombre: p.nombre,
-            Referencia_USD: p.precio_ref_usd,
-            Precio_BS: p.precio_bs,
-            Categoría: p.categoria,
-            Stock: p.stock
-        })));
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Inventario");
-        XLSX.writeFile(workbook, `inventario_${new Date().toISOString().split('T')[0]}.xlsx`);
+    const exportToExcel = async () => {
+        try {
+            const worksheet = XLSX.utils.json_to_sheet(filtered.map(p => ({
+                Código: p.codigo,
+                Nombre: p.nombre,
+                Referencia_USD: p.precio_ref_usd,
+                Precio_BS: p.precio_bs,
+                Categoría: p.categoria,
+                Stock: p.stock
+            })));
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Inventario");
+
+            const excelBase64 = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
+            const fileName = `inventario_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+            const path: string = await invoke("save_export_file", {
+                filename: fileName,
+                base64Data: excelBase64
+            });
+
+            alert(`Excel guardado con éxito en su carpeta de Descargas:\n${path}`);
+        } catch (error) {
+            console.error("Error al exportar Excel:", error);
+            alert("No se pudo generar el Excel. Error: " + error);
+        }
     };
 
     useEffect(() => {
-        fetchProductos();
-    }, []);
+        if (active !== false) {
+            fetchProductos();
+        }
+    }, [active]);
 
     const filtered = productos.filter(p =>
         p.nombre.toLowerCase().includes(search.toLowerCase()) ||
@@ -97,7 +127,7 @@ export function InventoryView() {
                 </div>
                 <div className="flex space-x-3">
                     <button
-                        onClick={handleRecalculate}
+                        onClick={() => setRecalculateOpen(true)}
                         className="flex items-center space-x-2 px-4 py-2 border border-primary text-primary hover:bg-primary/5 rounded-xl transition-colors font-medium"
                     >
                         <Calculator size={18} />
@@ -147,7 +177,8 @@ export function InventoryView() {
                                 <th className="px-6 py-4 font-semibold">Producto</th>
                                 <th className="px-6 py-4 font-semibold text-right">Ref ($)</th>
                                 <th className="px-6 py-4 font-semibold text-right">Bs.</th>
-                                <th className="px-6 py-4 font-semibold text-center">Stock</th>
+                                <th className="px-6 py-4 font-semibold text-center whitespace-nowrap">Tasa Ref.</th>
+                                <th className="px-6 py-4 font-semibold text-center">Disponibilidad</th>
                                 <th className="px-6 py-4 font-semibold text-center">Acciones</th>
                             </tr>
                         </thead>
@@ -174,12 +205,13 @@ export function InventoryView() {
                                         {formatCurrency(p.precio_bs, "BS")}
                                     </td>
                                     <td className="px-6 py-4 text-center">
-                                        <span className={cn(
-                                            "px-2 py-1 rounded-full text-xs font-bold",
-                                            p.stock > 10 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-                                        )}>
-                                            {p.stock}
-                                        </span>
+                                        <div className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md font-semibold">
+                                            <span>{p.price_per_dolar.toFixed(2)}</span>
+                                            <span>Bs/$</span>
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4 text-center">
+                                        {p.stock}
                                     </td>
                                     <td className="px-6 py-4">
                                         <div className="flex justify-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -217,6 +249,12 @@ export function InventoryView() {
                 isOpen={labelOpen}
                 onClose={() => setLabelOpen(false)}
                 product={selectedProduct}
+            />
+
+            <RecalculateModal
+                isOpen={recalculateOpen}
+                onClose={() => setRecalculateOpen(false)}
+                onConfirm={handleRecalculate}
             />
         </div>
     );
