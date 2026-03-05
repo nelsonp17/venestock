@@ -1,11 +1,10 @@
-import { LayoutDashboard, Package, History, Settings, LogOut } from "lucide-react";
+import { LayoutDashboard, Package, History } from "lucide-react";
 import { cn } from "../lib/utils";
 
 const menuItems = [
     { icon: LayoutDashboard, label: "Dashboard", id: "dashboard" },
     { icon: Package, label: "Inventario", id: "inventory" },
-    { icon: History, label: "Movimientos", id: "movements" },
-    { icon: Settings, label: "Configuración", id: "settings" },
+    { icon: History, label: "Movimientos", id: "movements" }
 ];
 
 export function Sidebar({ activeTab, onTabChange }: { activeTab: string, onTabChange: (id: string) => void }) {

@@ -66,12 +66,6 @@ function App() {
         <div className={cn("transition-all duration-300", activeTab === "movements" ? "block" : "hidden")}>
           <MovementsView active={activeTab === "movements"} />
         </div>
-        <div className={cn("transition-all duration-300", activeTab === "settings" ? "block" : "hidden")}>
-          <div className="p-8 text-center text-muted-foreground mt-20">
-            <h2 className="text-2xl font-bold">Configuración</h2>
-            <p className="text-sm">Ajustes generales del sistema próximamente.</p>
-          </div>
-        </div>
       </main>
 
       <TasaWidget />
