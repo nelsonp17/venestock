@@ -1,0 +1,80 @@
+import { useEffect, useState } from "react";
+import { Sidebar } from "./components/Sidebar";
+import { TasaWidget } from "./components/TasaWidget";
+import { cn, formatCurrency } from "./lib/utils";
+import { InventoryView } from "./views/InventoryView";
+import { MovementsView } from "./views/MovementsView";
+import { invoke } from "@tauri-apps/api/core";
+
+// Placeholder views
+function Dashboard() {
+  const [stats, setStats] = useState({ total_productos: 0, stock_bajo: 0, tasa_actual: 0 });
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const s: any = await invoke("get_stats");
+        setStats(s);
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    fetchStats();
+  }, []);
+
+  return (
+    <div className="p-8">
+      <h2 className="text-3xl font-bold mb-6">Panel de Control</h2>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="bg-white p-6 rounded-2xl border border-border shadow-sm">
+          <p className="text-sm text-muted-foreground font-medium">Productos Totales</p>
+          <p className="text-4xl font-bold mt-2">{stats.total_productos}</p>
+        </div>
+        <div className="bg-white p-6 rounded-2xl border border-border shadow-sm">
+          <p className="text-sm text-muted-foreground font-medium">Stock Bajo</p>
+          <p className="text-4xl font-bold mt-2 text-destructive">{stats.stock_bajo}</p>
+        </div>
+        <div className="bg-white p-6 rounded-2xl border border-border shadow-sm">
+          <p className="text-sm text-muted-foreground font-medium">Categorías</p>
+          <p className="text-4xl font-bold mt-2">---</p>
+        </div>
+        <div className="bg-white p-6 rounded-2xl border border-border shadow-sm">
+          <p className="text-sm text-muted-foreground font-medium">Tasa Actual (Bs)</p>
+          <p className="text-4xl font-bold mt-2 text-primary">{formatCurrency(stats.tasa_actual, "BS")}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [activeTab, setActiveTab] = useState("inventory");
+
+  return (
+    <div className="flex h-screen bg-secondary/30 selection:bg-primary/20">
+      <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
+
+      <main className="flex-1 overflow-auto">
+        <div className={cn("transition-all duration-300", activeTab === "dashboard" ? "block" : "hidden")}>
+          <Dashboard />
+        </div>
+        <div className={cn("transition-all duration-300", activeTab === "inventory" ? "block" : "hidden")}>
+          <InventoryView />
+        </div>
+        <div className={cn("transition-all duration-300", activeTab === "movements" ? "block" : "hidden")}>
+          <MovementsView />
+        </div>
+        <div className={cn("transition-all duration-300", activeTab === "settings" ? "block" : "hidden")}>
+          <div className="p-8 text-center text-muted-foreground mt-20">
+            <h2 className="text-2xl font-bold">Configuración</h2>
+            <p className="text-sm">Ajustes generales del sistema próximamente.</p>
+          </div>
+        </div>
+      </main>
+
+      <TasaWidget />
+    </div>
+  );
+}
+
+export default App;

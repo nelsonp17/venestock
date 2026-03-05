@@ -1,0 +1,37 @@
+use serde::{Deserialize, Serialize};
+use sqlx::FromRow;
+use chrono::NaiveDateTime;
+
+#[derive(Debug, Serialize, Deserialize, FromRow, Clone)]
+pub struct Producto {
+    pub id: Option<i32>,
+    pub codigo: String,
+    pub barras: Option<String>,
+    pub nombre: String,
+    pub descripcion: Option<String>,
+    pub precio_ref_usd: f64,
+    pub precio_bs: f64,
+    pub categoria: Option<String>,
+    pub subcategoria: Option<String>,
+    pub stock: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize, FromRow)]
+pub struct Tasa {
+    pub id: Option<i32>,
+    pub valor: f64,
+    pub fecha: NaiveDateTime,
+    pub fuente: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, FromRow)]
+pub struct Movimiento {
+    pub id: Option<i32>,
+    pub producto_id: i32,
+    pub tipo: String,
+    pub cantidad: i32,
+    pub tasa_momento: f64,
+    pub total_usd: f64,
+    pub total_bs: f64,
+    pub fecha: Option<NaiveDateTime>,
+}
