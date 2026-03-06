@@ -11,6 +11,7 @@ import * as XLSX from "xlsx";
 import { Producto } from "../types";
 import toast from "react-hot-toast";
 import { ConfirmModal } from "../components/ConfirmModal";
+import logoUrl from "../../public/tauri.png";
 
 export function InventoryView({ active }: { active?: boolean }) {
     const [productos, setProductos] = useState<Producto[]>([]);
@@ -22,10 +23,20 @@ export function InventoryView({ active }: { active?: boolean }) {
     const [editingProduct, setEditingProduct] = useState<Producto | null>(null);
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
     const [productToDelete, setProductToDelete] = useState<Producto | null>(null);
+    const [tasa, setTasa] = useState<{ valor: number; fuente: string; fecha: string } | null>(null);
 
     // Paginación
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
+
+    const fetchTasa = async () => {
+        try {
+            const result: any = await invoke("get_tasa_actual");
+            setTasa(result);
+        } catch (error) {
+            console.error("Error fetching tasa:", error);
+        }
+    };
 
     const fetchProductos = async () => {
         setLoading(true);
@@ -40,7 +51,7 @@ export function InventoryView({ active }: { active?: boolean }) {
     };
 
     const toggleSelection = (id: number) => {
-        setSelectedIds(prev => 
+        setSelectedIds(prev =>
             prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
         );
     };
@@ -80,20 +91,32 @@ export function InventoryView({ active }: { active?: boolean }) {
     const exportToPDF = async () => {
         try {
             const doc = new jsPDF();
-            doc.text("Reporte de Inventario - SGM VeneStock", 14, 15);
+            // 1. Encabezado personalizado
+
+            doc.addImage(logoUrl, 'PNG', 14, 10, 20, 20);
+
+            // Ajustamos los textos para que no se pisen con el logo
+            doc.setFontSize(18);
+            doc.text("VeneStock - Reporte de Inventario", 40, 18); // Desplazado a la derecha (x=40)
+
+            doc.setFontSize(10);
+            doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 40, 25);
+            doc.text(`Tasa aplicada: ${tasa?.valor || 0.00} Bs/$`, 40, 30);
 
             const tableData = filtered.map(p => [
                 p.codigo,
                 p.nombre,
                 formatCurrency(p.precio_ref_usd, "USD"),
+                p.price_per_dolar,
                 formatCurrency(p.precio_bs, "BS"),
                 p.stock.toString()
             ]);
 
             autoTable(doc, {
-                head: [["Código", "Nombre", "Precio ($)", "Precio (Bs)", "Stock"]],
+                head: [["Código", "Nombre", "Precio ($)", "Tasa", "Precio (Bs)", "Stock"]],
                 body: tableData,
-                startY: 20,
+                startY: 40,
+                headStyles: { fillColor: [30, 64, 175] } // Color azul para el header de la tabla
             });
 
             const dataUri = doc.output("datauristring");
@@ -143,6 +166,7 @@ export function InventoryView({ active }: { active?: boolean }) {
     useEffect(() => {
         if (active !== false) {
             fetchProductos();
+            fetchTasa();
         }
     }, [active]);
 
@@ -231,7 +255,7 @@ export function InventoryView({ active }: { active?: boolean }) {
                         <thead>
                             <tr className="bg-secondary/5 text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
                                 <th className="px-6 py-4 text-center w-10">
-                                    <input 
+                                    <input
                                         type="checkbox"
                                         className="w-4 h-4 rounded border-border text-primary focus:ring-primary/20"
                                         checked={selectedIds.length === paginatedProducts.length && paginatedProducts.length > 0}
@@ -241,8 +265,8 @@ export function InventoryView({ active }: { active?: boolean }) {
                                 <th className="px-6 py-4 font-semibold">Código</th>
                                 <th className="px-6 py-4 font-semibold">Producto</th>
                                 <th className="px-6 py-4 font-semibold text-right">Ref ($)</th>
-                                <th className="px-6 py-4 font-semibold text-right">Bs.</th>
                                 <th className="px-6 py-4 font-semibold text-center whitespace-nowrap">Tasa Ref.</th>
+                                <th className="px-6 py-4 font-semibold text-right">Bs.</th>
                                 <th className="px-6 py-4 font-semibold text-center">Disponibilidad</th>
                                 <th className="px-6 py-4 font-semibold text-center">Acciones</th>
                             </tr>
@@ -262,7 +286,7 @@ export function InventoryView({ active }: { active?: boolean }) {
                                     selectedIds.includes(p.id!) && "bg-primary/5"
                                 )}>
                                     <td className="px-6 py-4 text-center">
-                                        <input 
+                                        <input
                                             type="checkbox"
                                             className="w-4 h-4 rounded border-border text-primary focus:ring-primary/20"
                                             checked={selectedIds.includes(p.id!)}
@@ -277,14 +301,14 @@ export function InventoryView({ active }: { active?: boolean }) {
                                     <td className="px-6 py-4 text-right font-semibold text-primary">
                                         {formatCurrency(p.precio_ref_usd, "USD")}
                                     </td>
-                                    <td className="px-6 py-4 text-right font-bold text-foreground">
-                                        {formatCurrency(p.precio_bs, "BS")}
-                                    </td>
                                     <td className="px-6 py-4 text-center">
                                         <div className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md font-semibold">
                                             <span>{p.price_per_dolar.toFixed(2)}</span>
                                             <span>Bs/$</span>
                                         </div>
+                                    </td>
+                                    <td className="px-6 py-4 text-right font-bold text-foreground">
+                                        {formatCurrency(p.precio_bs, "BS")}
                                     </td>
                                     <td className="px-6 py-4 text-center font-bold">
                                         {p.stock}

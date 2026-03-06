@@ -1,4 +1,4 @@
-import { Info, Code, Shield, Mail, ExternalLink, Computer } from "lucide-react";
+import { Info, Code, Shield, Mail, ExternalLink } from "lucide-react";
 
 export function AboutView({ active }: { active: boolean }) {
     if (!active) return null;
@@ -8,8 +8,8 @@ export function AboutView({ active }: { active: boolean }) {
             {/* Header */}
             <div className="text-center space-y-4 mb-12">
                 <div className="w-24 h-24 bg-primary/10 rounded-3xl mx-auto flex items-center justify-center mb-6 shadow-sm border border-primary/20">
-                    <img src="/logo.png" alt="Logo" className="w-16 h-16 object-contain opacity-80" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-                    <Computer size={48} className="text-primary absolute" />
+                    <img src="/public/tauri.png" alt="Logo" className="w-16 h-16 object-contain opacity-80" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                    {/* <Computer size={48} className="text-primary" /> */}
                 </div>
                 <h2 className="text-4xl font-extrabold tracking-tight">SGM VeneStock</h2>
                 <p className="text-xl text-muted-foreground font-medium">Sistema de Gestión de Inventario</p>
@@ -18,7 +18,7 @@ export function AboutView({ active }: { active: boolean }) {
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                         <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
                     </span>
-                    <span className="text-sm font-semibold tracking-wider text-muted-foreground">V 0.1.0 (Beta)</span>
+                    <span className="text-sm font-semibold tracking-wider text-muted-foreground">V 0.1.0</span>
                 </div>
             </div>
 
@@ -86,7 +86,8 @@ export function AboutView({ active }: { active: boolean }) {
                         ¿Tienes dudas, sugerencias o necesitas reportar un problema? Ponte en contacto con el equipo de desarrollo.
                     </p>
                     <a
-                        href="mailto:nelsonportillo982@gmail.com"
+                        href="https://www.linkedin.com/in/nelson-portillo/"
+                        target="_blank"
                         className="inline-flex items-center justify-center space-x-2 w-full py-3 bg-white hover:bg-secondary/50 border border-primary/20 text-primary font-bold rounded-xl transition-colors"
                     >
                         <span>Contactar Desarrollador</span>

@@ -40,3 +40,15 @@ export interface Factura {
     observaciones: string | null;
     created_at: string | null;
 }
+
+export interface FacturaItem {
+    id: number;
+    producto_id: number;
+    producto_nombre: string;
+    producto_codigo: string;
+    cantidad: number;
+    total_usd: number;
+    total_bs: number;
+    tipo: 'ENTRADA' | 'SALIDA';
+    precio_unitario_usd: number;
+}

@@ -582,6 +582,54 @@ async fn delete_factura(state: State<'_, AppState>, id: i32) -> Result<(), Strin
     Ok(())
 }
 
+#[derive(serde::Serialize)]
+struct FacturaItem {
+    id: i32,
+    producto_id: i32,
+    producto_nombre: String,
+    producto_codigo: String,
+    cantidad: i32,
+    total_usd: f64,
+    total_bs: f64,
+    tipo: String,
+    precio_unitario_usd: f64,
+}
+
+#[tauri::command]
+async fn get_factura_items(state: State<'_, AppState>, factura_id: i32) -> Result<Vec<FacturaItem>, String> {
+    let rows = sqlx::query(
+        "SELECT m.id, m.producto_id, p.nombre as producto_nombre, p.codigo as producto_codigo, 
+                m.cantidad, m.total_usd, m.total_bs, m.tipo
+         FROM movimientos m
+         JOIN productos p ON p.id = m.producto_id
+         WHERE m.factura_id = ?
+         ORDER BY m.id DESC"
+    )
+    .bind(factura_id)
+    .fetch_all(&state.db)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let items = rows.iter().map(|r| {
+        use sqlx::Row;
+        let total_usd: f64 = r.get("total_usd");
+        let cantidad: i32 = r.get("cantidad");
+        FacturaItem {
+            id: r.get("id"),
+            producto_id: r.get("producto_id"),
+            producto_nombre: r.get("producto_nombre"),
+            producto_codigo: r.get("producto_codigo"),
+            cantidad,
+            total_usd,
+            total_bs: r.get("total_bs"),
+            tipo: r.get("tipo"),
+            precio_unitario_usd: if cantidad > 0 { total_usd / cantidad as f64 } else { 0.0 },
+        }
+    }).collect();
+
+    Ok(items)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -618,7 +666,8 @@ pub fn run() {
             get_dashboard_stats,
             get_facturas,
             upsert_factura,
-            delete_factura
+            delete_factura,
+            get_factura_items
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

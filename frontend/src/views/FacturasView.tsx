@@ -2,11 +2,12 @@ import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
     FileText, Pencil, Trash2, X, FilePlus, Search,
-    ChevronLeft, ChevronRight, Hash, Calendar, Truck
+    ChevronLeft, ChevronRight, Hash, Calendar, Truck, ArrowLeft, Package, DollarSign
 } from "lucide-react";
-import { Factura } from "../types";
+import { Factura, FacturaItem } from "../types";
 import { toast } from "react-hot-toast";
 import { ConfirmModal } from "../components/ConfirmModal";
+import { formatCurrency } from "../lib/utils";
 
 export function FacturasView({ active }: { active: boolean }) {
     const [facturas, setFacturas] = useState<Factura[]>([]);
@@ -15,6 +16,11 @@ export function FacturasView({ active }: { active: boolean }) {
     const [editMode, setEditMode] = useState(false);
     const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
+
+    // Detalles de Factura
+    const [selectedFactura, setSelectedFactura] = useState<Factura | null>(null);
+    const [facturaItems, setFacturaItems] = useState<FacturaItem[]>([]);
+    const [loadingItems, setLoadingItems] = useState(false);
 
     // Paginación
     const [currentPage, setCurrentPage] = useState(1);
@@ -40,11 +46,31 @@ export function FacturasView({ active }: { active: boolean }) {
         }
     };
 
+    const fetchFacturaItems = async (facturaId: number) => {
+        setLoadingItems(true);
+        try {
+            const items = await invoke("get_factura_items", { facturaId }) as FacturaItem[];
+            setFacturaItems(items);
+        } catch (error) {
+            console.error("Error fetching factura items:", error);
+            toast.error("Error al cargar productos de la factura");
+        } finally {
+            setLoadingItems(false);
+        }
+    };
+
     useEffect(() => {
         if (active) {
             fetchFacturas();
         }
     }, [active]);
+
+    const handleSelectFactura = (factura: Factura) => {
+        setSelectedFactura(factura);
+        if (factura.id) {
+            fetchFacturaItems(factura.id);
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -84,7 +110,8 @@ export function FacturasView({ active }: { active: boolean }) {
         });
     };
 
-    const handleEdit = (factura: Factura) => {
+    const handleEdit = (e: React.MouseEvent, factura: Factura) => {
+        e.stopPropagation();
         setFormData({ ...factura });
         setEditMode(true);
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -106,6 +133,129 @@ export function FacturasView({ active }: { active: boolean }) {
     };
 
     if (!active) return null;
+
+    if (selectedFactura) {
+        return (
+            <div className="p-8 max-w-6xl mx-auto space-y-8 animate-in slide-in-from-right duration-300">
+                <button
+                    onClick={() => setSelectedFactura(null)}
+                    className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors group"
+                >
+                    <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
+                    Volver al listado
+                </button>
+
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                        <div className="flex items-center gap-3">
+                            <div className="p-3 bg-primary/10 rounded-2xl text-primary">
+                                <FileText size={32} />
+                            </div>
+                            <div>
+                                <h2 className="text-3xl font-bold">Factura {selectedFactura.numero}</h2>
+                                <p className="text-muted-foreground flex items-center gap-2 mt-1">
+                                    <Calendar size={16} /> {selectedFactura.fecha}
+                                    {selectedFactura.proveedor && (
+                                        <>
+                                            <span className="text-border">|</span>
+                                            <Truck size={16} /> {selectedFactura.proveedor}
+                                        </>
+                                    )}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white border border-border p-4 rounded-2xl shadow-sm flex gap-8">
+                        <div>
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total USD</p>
+                            <p className="text-2xl font-black text-primary">
+                                {formatCurrency(facturaItems.reduce((acc, item) => acc + item.total_usd, 0), "USD")}
+                            </p>
+                        </div>
+                        <div className="w-px bg-border self-stretch" />
+                        <div>
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Productos</p>
+                            <p className="text-2xl font-black">{facturaItems.length}</p>
+                        </div>
+                    </div>
+                </div>
+
+                {selectedFactura.observaciones && (
+                    <div className="bg-secondary/5 border border-border p-4 rounded-xl italic text-muted-foreground text-sm">
+                        "{selectedFactura.observaciones}"
+                    </div>
+                )}
+
+                <div className="bg-white border border-border rounded-3xl shadow-sm overflow-hidden">
+                    <table className="w-full text-left">
+                        <thead className="bg-secondary/5 border-b border-border">
+                            <tr>
+                                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Producto</th>
+                                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Tipo</th>
+                                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground text-center">Cant.</th>
+                                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">Precio Unit.</th>
+                                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">Total USD</th>
+                                <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">Total BS</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                            {loadingItems ? (
+                                Array.from({ length: 3 }).map((_, i) => (
+                                    <tr key={i} className="animate-pulse">
+                                        <td colSpan={6} className="px-6 py-8 h-12 bg-gray-50/50" />
+                                    </tr>
+                                ))
+                            ) : facturaItems.length === 0 ? (
+                                <tr>
+                                    <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground italic">
+                                        No hay productos vinculados a esta factura.
+                                    </td>
+                                </tr>
+                            ) : (
+                                facturaItems.map((item) => (
+                                    <tr key={item.id} className="hover:bg-secondary/5 transition-colors group">
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 bg-secondary rounded-lg text-muted-foreground">
+                                                    <Package size={16} />
+                                                </div>
+                                                <div>
+                                                    <p className="font-bold text-sm">{item.producto_nombre}</p>
+                                                    <p className="text-xs font-mono text-muted-foreground">{item.producto_codigo}</p>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${
+                                                item.tipo === 'ENTRADA' 
+                                                    ? 'bg-emerald-100 text-emerald-700' 
+                                                    : 'bg-orange-100 text-orange-700'
+                                            }`}>
+                                                {item.tipo}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 text-center font-mono font-bold">
+                                            {item.cantidad}
+                                        </td>
+                                        <td className="px-6 py-4 text-right font-mono text-sm">
+                                            {formatCurrency(item.precio_unitario_usd, "USD")}
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <p className="font-black text-sm">{formatCurrency(item.total_usd, "USD")}</p>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <p className="text-xs text-muted-foreground">{formatCurrency(item.total_bs, "VES")}</p>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        );
+    }
 
     // Filtrado y Paginación
     const filteredFacturas = facturas.filter(f =>
@@ -239,16 +389,20 @@ export function FacturasView({ active }: { active: boolean }) {
                         </div>
                     ) : (
                         paginatedFacturas.map(f => (
-                            <div key={f.id} className="bg-white border border-border rounded-2xl p-5 shadow-sm hover:shadow-md transition-all group relative overflow-hidden">
+                            <div 
+                                key={f.id} 
+                                onClick={() => handleSelectFactura(f)}
+                                className="bg-white border border-border rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-primary/30 transition-all group relative overflow-hidden cursor-pointer active:scale-95"
+                            >
                                 <div className="absolute top-0 right-0 p-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <button
-                                        onClick={() => handleEdit(f)}
+                                        onClick={(e) => handleEdit(e, f)}
                                         className="p-1.5 bg-secondary text-muted-foreground hover:text-primary rounded-lg transition-colors"
                                     >
                                         <Pencil size={14} />
                                     </button>
                                     <button
-                                        onClick={() => setConfirmDeleteId(f.id!)}
+                                        onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(f.id!); }}
                                         className="p-1.5 bg-red-50 text-red-400 hover:text-red-600 rounded-lg transition-colors"
                                     >
                                         <Trash2 size={14} />
