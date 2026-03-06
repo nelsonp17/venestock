@@ -1,18 +1,23 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Plus, ArrowUpRight, ArrowDownLeft, Calendar, Search, FileText, Pencil, Trash2, X, FilePlus } from "lucide-react";
+import { Plus, ArrowUpRight, ArrowDownLeft, Calendar, Search, FileText, Pencil, Trash2, X, FilePlus, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn, formatCurrency } from "../lib/utils";
 import { Movimiento, Producto, Factura } from "../types";
 import { toast } from "react-hot-toast";
 import { ConfirmModal } from "../components/ConfirmModal";
+import { SearchableSelect } from "../components/SearchableSelect";
 
-export function MovementsView({ active }: { active?: boolean }) {
+export function MovementsView({ active, onNavigateToFacturas }: { active?: boolean, onNavigateToFacturas?: () => void }) {
     const [movements, setMovements] = useState<Movimiento[]>([]);
     const [productos, setProductos] = useState<Producto[]>([]);
     const [facturas, setFacturas] = useState<Factura[]>([]);
     const [loading, setLoading] = useState(true);
     const [modalOpen, setModalOpen] = useState(false);
-    const [facturasModalOpen, setFacturasModalOpen] = useState(false);
+    const [movementToDelete, setMovementToDelete] = useState<number | null>(null);
+
+    // Paginación
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
 
     const fetchData = async () => {
         setLoading(true);
@@ -36,6 +41,19 @@ export function MovementsView({ active }: { active?: boolean }) {
         }
     }, [active]);
 
+    const handleDeleteMovement = async () => {
+        if (!movementToDelete) return;
+        try {
+            await invoke("delete_movement", { id: movementToDelete });
+            toast.success("Movimiento eliminado");
+            fetchData();
+        } catch (error) {
+            toast.error("Error al eliminar movimiento: " + error);
+        } finally {
+            setMovementToDelete(null);
+        }
+    };
+
     const getProductName = (id: number) => {
         const p = productos.find(prod => prod.id === id);
         return p ? p.nombre : "Producto desconocido";
@@ -47,6 +65,13 @@ export function MovementsView({ active }: { active?: boolean }) {
         return f || null;
     };
 
+    // Lógica de paginación
+    const totalPages = Math.ceil(movements.length / itemsPerPage);
+    const paginatedMovements = movements.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
+    );
+
     return (
         <div className="p-8">
             <div className="flex justify-between items-center mb-8">
@@ -56,7 +81,7 @@ export function MovementsView({ active }: { active?: boolean }) {
                 </div>
                 <div className="flex items-center space-x-3">
                     <button
-                        onClick={() => setFacturasModalOpen(true)}
+                        onClick={onNavigateToFacturas}
                         className="flex items-center space-x-2 px-4 py-3 bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-2xl transition-all font-semibold border border-border active:scale-95"
                     >
                         <FileText size={20} />
@@ -72,78 +97,94 @@ export function MovementsView({ active }: { active?: boolean }) {
                 </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+            <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden flex flex-col">
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left">
+                    <table className="w-full text-left border-collapse">
                         <thead>
-                            <tr className="bg-secondary/5 text-xs uppercase tracking-wider text-muted-foreground">
+                            <tr className="bg-secondary/5 text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
+                                <th className="px-6 py-4 font-semibold text-center w-10">#</th>
                                 <th className="px-6 py-4 font-semibold">Fecha</th>
                                 <th className="px-6 py-4 font-semibold">Tipo</th>
                                 <th className="px-6 py-4 font-semibold">Producto</th>
                                 <th className="px-6 py-4 font-semibold text-center">Cantidad</th>
-                                <th className="px-6 py-4 font-semibold text-right">Tasa Ref.</th>
+                                <th className="px-6 py-4 font-semibold text-right">Tasa</th>
                                 <th className="px-6 py-4 font-semibold text-right">Total ($)</th>
-                                <th className="px-6 py-4 font-semibold text-right">Total (Bs)</th>
                                 <th className="px-6 py-4 font-semibold">Factura</th>
+                                <th className="px-6 py-4 font-semibold text-center">Acciones</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
                             {loading ? (
                                 <tr>
-                                    <td colSpan={8} className="px-6 py-12 text-center text-muted-foreground text-sm">Cargando historial...</td>
+                                    <td colSpan={9} className="px-6 py-12 text-center text-muted-foreground text-sm italic">Cargando historial...</td>
                                 </tr>
-                            ) : movements.length === 0 ? (
+                            ) : paginatedMovements.length === 0 ? (
                                 <tr>
-                                    <td colSpan={8} className="px-6 py-12 text-center text-muted-foreground text-sm">No hay movimientos registrados.</td>
+                                    <td colSpan={9} className="px-6 py-12 text-center text-muted-foreground text-sm italic">No hay movimientos registrados.</td>
                                 </tr>
-                            ) : movements.map((m) => {
+                            ) : paginatedMovements.map((m, idx) => {
                                 const factura = getFacturaInfo(m.factura_id);
                                 return (
-                                <tr key={m.id} className="hover:bg-secondary/5 transition-colors">
+                                <tr key={m.id} className="hover:bg-secondary/5 transition-colors group">
+                                    <td className="px-6 py-4 text-xs text-muted-foreground font-mono text-center">
+                                        {(currentPage - 1) * itemsPerPage + idx + 1}
+                                    </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="flex items-center space-x-2 text-xs">
-                                            <Calendar size={14} className="text-muted-foreground" />
-                                            <span>{m.fecha ? new Date(m.fecha).toLocaleString() : "---"}</span>
+                                        <div className="flex flex-col text-xs">
+                                            <span className="font-bold text-foreground">
+                                                {m.fecha ? new Date(m.fecha).toLocaleDateString() : "---"}
+                                            </span>
+                                            <span className="text-muted-foreground opacity-70">
+                                                {m.fecha ? new Date(m.fecha).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ""}
+                                            </span>
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
                                         <span className={cn(
-                                            "inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase",
+                                            "inline-flex items-center space-x-1 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-tight",
                                             m.tipo === "ENTRADA"
                                                 ? "bg-green-100 text-green-700"
                                                 : "bg-orange-100 text-orange-700"
                                         )}>
-                                            {m.tipo === "ENTRADA" ? <ArrowDownLeft size={12} /> : <ArrowUpRight size={12} />}
+                                            {m.tipo === "ENTRADA" ? <ArrowDownLeft size={10} /> : <ArrowUpRight size={10} />}
                                             <span>{m.tipo}</span>
                                         </span>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <div className="font-medium text-sm text-foreground truncate max-w-[200px]">
+                                        <div className="font-medium text-sm text-foreground truncate max-w-[180px]" title={getProductName(m.producto_id)}>
                                             {getProductName(m.producto_id)}
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 text-center font-bold">{m.cantidad}</td>
+                                    <td className="px-6 py-4 text-center font-bold text-sm">{m.cantidad}</td>
+                                    <td className="px-6 py-4 text-right">
+                                        <span className="font-mono text-xs text-muted-foreground">{(m.price_per_dolar || m.tasa_momento).toFixed(2)}</span>
+                                    </td>
                                     <td className="px-6 py-4 text-right">
                                         <div className="flex flex-col items-end">
-                                            <span className="font-bold text-sm">{(m.price_per_dolar || m.tasa_momento).toFixed(2)}</span>
-                                            <span className="text-[10px] text-muted-foreground uppercase">Bs/$</span>
+                                            <span className="font-bold text-sm text-primary">{formatCurrency(m.total_usd, "USD")}</span>
+                                            <span className="text-[10px] text-muted-foreground">{formatCurrency(m.total_bs, "BS")}</span>
                                         </div>
-                                    </td>
-                                    <td className="px-6 py-4 text-right font-mono text-sm text-primary">
-                                        {formatCurrency(m.total_usd, "USD")}
-                                    </td>
-                                    <td className="px-6 py-4 text-right font-bold text-sm">
-                                        {formatCurrency(m.total_bs, "BS")}
                                     </td>
                                     <td className="px-6 py-4">
                                         {factura ? (
-                                            <div className="flex items-center space-x-1 text-xs">
-                                                <FileText size={12} className="text-primary" />
-                                                <span className="font-mono font-bold text-primary">{factura.numero}</span>
+                                            <div className="flex items-center space-x-1 text-[10px] bg-primary/5 text-primary px-2 py-1 rounded-lg border border-primary/10 w-fit">
+                                                <FileText size={10} />
+                                                <span className="font-mono font-bold">{factura.numero}</span>
                                             </div>
                                         ) : (
-                                            <span className="text-xs text-muted-foreground">-</span>
+                                            <span className="text-[10px] text-muted-foreground italic">-</span>
                                         )}
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="flex justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button
+                                                onClick={() => setMovementToDelete(m.id!)}
+                                                className="p-2 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                                                title="Eliminar movimiento"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                                 );
@@ -151,6 +192,34 @@ export function MovementsView({ active }: { active?: boolean }) {
                         </tbody>
                     </table>
                 </div>
+
+                {/* Footer con Paginación */}
+                {totalPages > 1 && (
+                    <div className="p-4 border-t border-border bg-secondary/5 flex items-center justify-between">
+                        <p className="text-xs text-muted-foreground">
+                            Mostrando <span className="font-bold text-foreground">{paginatedMovements.length}</span> de <span className="font-bold text-foreground">{movements.length}</span> movimientos
+                        </p>
+                        <div className="flex items-center space-x-2">
+                            <button
+                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                disabled={currentPage === 1}
+                                className="p-2 hover:bg-white border border-border rounded-xl disabled:opacity-30 transition-all active:scale-90"
+                            >
+                                <ChevronLeft size={18} />
+                            </button>
+                            <div className="flex items-center px-4 h-9 bg-white border border-border rounded-xl text-xs font-bold">
+                                Página {currentPage} de {totalPages}
+                            </div>
+                            <button
+                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                disabled={currentPage === totalPages}
+                                className="p-2 hover:bg-white border border-border rounded-xl disabled:opacity-30 transition-all active:scale-90"
+                            >
+                                <ChevronRight size={18} />
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
 
             <MovementModal
@@ -161,10 +230,14 @@ export function MovementsView({ active }: { active?: boolean }) {
                 facturas={facturas}
             />
 
-            <FacturasModal
-                isOpen={facturasModalOpen}
-                onClose={() => setFacturasModalOpen(false)}
-                onSave={fetchData}
+            <ConfirmModal 
+                isOpen={!!movementToDelete}
+                onClose={() => setMovementToDelete(null)}
+                onConfirm={handleDeleteMovement}
+                title="¿Eliminar movimiento?"
+                description="Esta acción revertirá (si es posible) el stock del producto afectado y borrará el registro permanente del historial."
+                variant="danger"
+                confirmText="Eliminar permanentemente"
             />
         </div>
     );
@@ -388,18 +461,15 @@ function MovementModal({ isOpen, onClose, onSave, productos, facturas }: {
 
                     <div className="space-y-1">
                         <label className="text-sm font-semibold">Factura (opcional)</label>
-                        <select
-                            className="w-full px-4 py-2 border border-border rounded-xl outline-none focus:ring-2 focus:ring-primary/20"
-                            value={formData.factura_id || ""}
-                            onChange={e => setFormData({ ...formData, factura_id: e.target.value ? parseInt(e.target.value) : null })}
-                        >
-                            <option value="">Sin factura</option>
-                            {facturas.map(f => (
-                                <option key={f.id} value={f.id || ''}>
-                                    {f.numero} - {f.fecha} {f.proveedor ? `(${f.proveedor})` : ''}
-                                </option>
-                            ))}
-                        </select>
+                        <SearchableSelect
+                            options={facturas.map(f => ({
+                                value: String(f.id),
+                                label: `${f.numero} - ${f.fecha} ${f.proveedor ? `(${f.proveedor})` : ""}`
+                            }))}
+                            value={formData.factura_id ? String(formData.factura_id) : ""}
+                            onChange={(val) => setFormData({ ...formData, factura_id: val ? parseInt(val) : null })}
+                            placeholder="Seleccionar factura..."
+                        />
                     </div>
 
                     <div className="flex justify-between items-center px-4 py-2 bg-primary/5 rounded-lg border border-primary/10">
@@ -421,233 +491,3 @@ function MovementModal({ isOpen, onClose, onSave, productos, facturas }: {
     );
 }
 
-function FacturasModal({ isOpen, onClose, onSave }: {
-    isOpen: boolean,
-    onClose: () => void,
-    onSave: () => void
-}) {
-    const [facturas, setFacturas] = useState<Factura[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [actionLoading, setActionLoading] = useState(false);
-    const [editMode, setEditMode] = useState(false);
-    const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
-
-    const [formData, setFormData] = useState<Partial<Factura>>({
-        numero: "",
-        fecha: new Date().toISOString().slice(0, 10),
-        proveedor: "",
-        observaciones: ""
-    });
-
-    const fetchFacturas = async () => {
-        try {
-            const f = await invoke("get_facturas") as Factura[];
-            setFacturas(f);
-        } catch (error) {
-            console.error("Error fetching facturas:", error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        if (isOpen) {
-            fetchFacturas();
-            setEditMode(false);
-            setFormData({
-                numero: "",
-                fecha: new Date().toISOString().slice(0, 10),
-                proveedor: "",
-                observaciones: ""
-            });
-        }
-    }, [isOpen]);
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!formData.numero || !formData.fecha) {
-            return toast.error("Número y fecha son requeridos");
-        }
-
-        const facturaData: Factura = {
-            id: formData.id || null,
-            numero: formData.numero || "",
-            fecha: formData.fecha || "",
-            proveedor: formData.proveedor || null,
-            observaciones: formData.observaciones || null,
-            created_at: null
-        };
-
-        setActionLoading(true);
-        try {
-            await invoke("upsert_factura", { factura: facturaData });
-            toast.success(editMode ? "Factura actualizada" : "Factura registrada");
-            fetchFacturas();
-            setEditMode(false);
-            setFormData({
-                numero: "",
-                fecha: new Date().toISOString().slice(0, 10),
-                proveedor: "",
-                observaciones: ""
-            });
-            onSave();
-        } catch (error) {
-            toast.error("Error: " + error);
-        } finally {
-            setActionLoading(false);
-        }
-    };
-
-    const handleEdit = (factura: Factura) => {
-        setFormData({ ...factura });
-        setEditMode(true);
-    };
-
-    const handleDelete = async () => {
-        if (!confirmDeleteId) return;
-        setActionLoading(true);
-        try {
-            await invoke("delete_factura", { id: confirmDeleteId });
-            toast.success("Factura eliminada");
-            fetchFacturas();
-            onSave();
-        } catch (error) {
-            toast.error("Error: " + error);
-        } finally {
-            setActionLoading(false);
-            setConfirmDeleteId(null);
-        }
-    };
-
-    if (!isOpen) return null;
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 max-h-[90vh] flex flex-col">
-                <div className="p-6 border-b border-border flex justify-between items-center">
-                    <h3 className="text-xl font-bold">Administrar Facturas</h3>
-                    <button onClick={onClose} className="p-2 hover:bg-secondary rounded-lg transition-colors">
-                        <X size={20} />
-                    </button>
-                </div>
-                
-                <div className="p-6 border-b border-border bg-secondary/5">
-                    <form onSubmit={handleSubmit} className="grid grid-cols-4 gap-4">
-                        <div className="space-y-1">
-                            <label className="text-xs font-bold uppercase">Número</label>
-                            <input
-                                type="text"
-                                required
-                                className="w-full px-3 py-2 border border-border rounded-lg text-sm font-mono outline-none focus:ring-2 focus:ring-primary/20"
-                                value={formData.numero}
-                                onChange={e => setFormData({ ...formData, numero: e.target.value })}
-                                placeholder="001-001-0000001"
-                            />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-xs font-bold uppercase">Fecha</label>
-                            <input
-                                type="date"
-                                required
-                                className="w-full px-3 py-2 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/20"
-                                value={formData.fecha}
-                                onChange={e => setFormData({ ...formData, fecha: e.target.value })}
-                            />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-xs font-bold uppercase">Proveedor</label>
-                            <input
-                                type="text"
-                                className="w-full px-3 py-2 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/20"
-                                value={formData.proveedor || ""}
-                                onChange={e => setFormData({ ...formData, proveedor: e.target.value })}
-                                placeholder="Nombre del proveedor"
-                            />
-                        </div>
-                        <div className="space-y-1 flex items-end">
-                            <div className="flex space-x-2 w-full">
-                                {editMode && (
-                                    <button
-                                        type="button"
-                                        disabled={actionLoading}
-                                        onClick={() => {
-                                            setEditMode(false);
-                                            setFormData({
-                                                numero: "",
-                                                fecha: new Date().toISOString().slice(0, 10),
-                                                proveedor: "",
-                                                observaciones: ""
-                                            });
-                                        }}
-                                        className="px-3 py-2 border border-border rounded-lg text-sm hover:bg-secondary transition-colors disabled:opacity-50"
-                                    >
-                                        <X size={16} />
-                                    </button>
-                                )}
-                                <button
-                                    type="submit"
-                                    disabled={actionLoading}
-                                    className="flex-1 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-sm hover:opacity-90 transition-all flex items-center justify-center space-x-1 shadow-md active:scale-95 disabled:opacity-50"
-                                >
-                                    <FilePlus size={16} />
-                                    <span>{actionLoading ? "..." : editMode ? "Actualizar" : "Agregar"}</span>
-                                </button>
-                            </div>
-                        </div>
-                    </form>
-                </div>
-
-                <div className="flex-1 overflow-y-auto p-6">
-                    {loading ? (
-                        <div className="text-center py-8 text-muted-foreground">Cargando...</div>
-                    ) : facturas.length === 0 ? (
-                        <div className="text-center py-8 text-muted-foreground">No hay facturas registradas.</div>
-                    ) : (
-                        <div className="space-y-2">
-                            {facturas.map(f => (
-                                <div key={f.id} className="flex items-center justify-between p-3 border border-border rounded-lg hover:bg-secondary/5 transition-colors group">
-                                    <div className="flex items-center space-x-4">
-                                        <div className="p-2 bg-primary/10 rounded-lg">
-                                            <FileText size={18} className="text-primary" />
-                                        </div>
-                                        <div>
-                                            <div className="font-mono font-bold text-sm">{f.numero}</div>
-                                            <div className="text-xs text-muted-foreground">
-                                                {f.fecha} {f.proveedor && `• ${f.proveedor}`}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button
-                                            onClick={() => handleEdit(f)}
-                                            className="p-2 hover:bg-secondary rounded-lg transition-colors text-muted-foreground hover:text-primary"
-                                        >
-                                            <Pencil size={16} />
-                                        </button>
-                                        <button
-                                            onClick={() => setConfirmDeleteId(f.id!)}
-                                            className="p-2 hover:bg-red-50 rounded-lg transition-colors text-muted-foreground hover:text-red-600"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            <ConfirmModal 
-                isOpen={!!confirmDeleteId}
-                onClose={() => setConfirmDeleteId(null)}
-                onConfirm={handleDelete}
-                title="¿Eliminar factura?"
-                description="Los movimientos asociados a esta factura no se eliminarán, pero perderán su referencia."
-                variant="danger"
-                confirmText="Eliminar"
-                loading={actionLoading}
-            />
-        </div>
-    );
-}

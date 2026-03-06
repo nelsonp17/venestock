@@ -62,7 +62,7 @@ export function InventoryView({ active }: { active?: boolean }) {
     const exportToPDF = async () => {
         try {
             const doc = new jsPDF();
-            doc.text("Reporte de Inventario - SGM Venestock", 14, 15);
+            doc.text("Reporte de Inventario - SGM VeneStock", 14, 15);
 
             const tableData = filtered.map(p => [
                 p.codigo,

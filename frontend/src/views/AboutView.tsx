@@ -11,7 +11,7 @@ export function AboutView({ active }: { active: boolean }) {
                     <img src="/logo.png" alt="Logo" className="w-16 h-16 object-contain opacity-80" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                     <Computer size={48} className="text-primary absolute" />
                 </div>
-                <h2 className="text-4xl font-extrabold tracking-tight">SGM Venestock</h2>
+                <h2 className="text-4xl font-extrabold tracking-tight">SGM VeneStock</h2>
                 <p className="text-xl text-muted-foreground font-medium">Sistema de Gestión de Inventario</p>
                 <div className="inline-flex items-center space-x-2 bg-secondary/50 px-4 py-1.5 rounded-full border border-border">
                     <span className="relative flex h-2.5 w-2.5">
@@ -30,7 +30,7 @@ export function AboutView({ active }: { active: boolean }) {
                     </div>
                     <h3 className="text-xl font-bold mb-4">Acerca del Software</h3>
                     <p className="text-muted-foreground leading-relaxed">
-                        SGM Venestock es una herramienta integral diseñada para simplificar y optimizar el control de inventario,
+                        SGM VeneStock es una herramienta integral diseñada para simplificar y optimizar el control de inventario,
                         seguimiento de movimientos y cálculo de rentabilidad en tiempo real. Construido pensando en la velocidad
                         y la experiencia del usuario, permitiendo gestionar el catálogo de productos con tasas multi-divisa (USD/Bs).
                     </p>
@@ -97,7 +97,7 @@ export function AboutView({ active }: { active: boolean }) {
 
             <div className="text-center pt-8 border-t border-border mt-12">
                 <p className="text-sm text-muted-foreground">
-                    &copy; {new Date().getFullYear()} SGM Venestock. Todos los derechos reservados.
+                    &copy; {new Date().getFullYear()} SGM VeneStock. Todos los derechos reservados.
                 </p>
             </div>
         </div>

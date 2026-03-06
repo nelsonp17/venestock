@@ -16,13 +16,16 @@ export function LabelModal({ isOpen, onClose, product }: LabelModalProps) {
     useEffect(() => {
         if (isOpen && product && product.barras && canvasRef.current) {
             try {
+                const barcodeValue = product.barras;
+                const bcid = barcodeValue.length === 12 || barcodeValue.length === 13 ? "ean13" : "code128";
+
                 bwipjs.toCanvas(canvasRef.current, {
-                    bcid: product.barras,  // Barcode type
-                    text: product.barras,  // Text to encode
-                    scale: 3,              // 3x scaling factor
-                    height: 10,            // Bar height, in millimeters
-                    includetext: true,     // Show human-readable text
-                    textxalign: "center",  // Always good to set this
+                    bcid: bcid,
+                    text: barcodeValue,
+                    scale: 3,
+                    height: 10,
+                    includetext: true,
+                    textxalign: "center",
                 });
             } catch (e) {
                 console.error("Error generating barcode:", e);
@@ -58,7 +61,7 @@ export function LabelModal({ isOpen, onClose, product }: LabelModalProps) {
                             <span className="text-primary">{formatCurrency(product.precio_ref_usd, "USD")}</span>
                             {/* <span className="text-foreground">{formatCurrency(product.precio_bs, "BS")}</span> */}
                         </div>
-                        {/* <p className="text-[10px] text-muted-foreground">SGM Venestock - {new Date().toLocaleDateString()}</p> */}
+                        {/* <p className="text-[10px] text-muted-foreground">SGM VeneStock - {new Date().toLocaleDateString()}</p> */}
                     </div>
                 </div>
 

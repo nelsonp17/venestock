@@ -1,0 +1,292 @@
+import { useState, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { 
+    FileText, Pencil, Trash2, X, FilePlus, Search, 
+    ChevronLeft, ChevronRight, Hash, Calendar, Truck 
+} from "lucide-react";
+import { cn } from "../lib/utils";
+import { Factura } from "../types";
+import { toast } from "react-hot-toast";
+import { ConfirmModal } from "../components/ConfirmModal";
+
+export function FacturasView({ active }: { active: boolean }) {
+    const [facturas, setFacturas] = useState<Factura[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [actionLoading, setActionLoading] = useState(false);
+    const [editMode, setEditMode] = useState(false);
+    const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+    const [searchQuery, setSearchQuery] = useState("");
+    
+    // Paginación
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 8;
+
+    const [formData, setFormData] = useState<Partial<Factura>>({
+        numero: "",
+        fecha: new Date().toISOString().slice(0, 10),
+        proveedor: "",
+        observaciones: ""
+    });
+
+    const fetchFacturas = async () => {
+        setLoading(true);
+        try {
+            const f = await invoke("get_facturas") as Factura[];
+            setFacturas(f);
+        } catch (error) {
+            console.error("Error fetching facturas:", error);
+            toast.error("Error al cargar facturas");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (active) {
+            fetchFacturas();
+        }
+    }, [active]);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!formData.numero || !formData.fecha) {
+            return toast.error("Número y fecha son requeridos");
+        }
+
+        const facturaData: Factura = {
+            id: formData.id || null,
+            numero: formData.numero || "",
+            fecha: formData.fecha || "",
+            proveedor: formData.proveedor || null,
+            observaciones: formData.observaciones || null,
+            created_at: null
+        };
+
+        setActionLoading(true);
+        try {
+            await invoke("upsert_factura", { factura: facturaData });
+            toast.success(editMode ? "Factura actualizada" : "Factura registrada");
+            fetchFacturas();
+            resetForm();
+        } catch (error) {
+            toast.error("Error: " + error);
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const resetForm = () => {
+        setEditMode(false);
+        setFormData({
+            numero: "",
+            fecha: new Date().toISOString().slice(0, 10),
+            proveedor: "",
+            observaciones: ""
+        });
+    };
+
+    const handleEdit = (factura: Factura) => {
+        setFormData({ ...factura });
+        setEditMode(true);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const handleDelete = async () => {
+        if (!confirmDeleteId) return;
+        setActionLoading(true);
+        try {
+            await invoke("delete_factura", { id: confirmDeleteId });
+            toast.success("Factura eliminada");
+            fetchFacturas();
+        } catch (error) {
+            toast.error("Error: " + error);
+        } finally {
+            setActionLoading(false);
+            setConfirmDeleteId(null);
+        }
+    };
+
+    if (!active) return null;
+
+    // Filtrado y Paginación
+    const filteredFacturas = facturas.filter(f => 
+        f.numero.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (f.proveedor?.toLowerCase() || "").includes(searchQuery.toLowerCase())
+    );
+
+    const totalPages = Math.ceil(filteredFacturas.length / itemsPerPage);
+    const paginatedFacturas = filteredFacturas.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
+    );
+
+    return (
+        <div className="p-8 max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
+            <div>
+                <h2 className="text-3xl font-bold">Administrar Facturas</h2>
+                <p className="text-muted-foreground mt-1">Registra y gestiona las facturas de tus proveedores.</p>
+            </div>
+
+            {/* Formulario de Registro */}
+            <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-border bg-secondary/5 flex items-center gap-2">
+                    <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                        <FilePlus size={20} />
+                    </div>
+                    <h3 className="font-bold text-lg">{editMode ? "Editar Factura" : "Nueva Factura"}</h3>
+                </div>
+                <form onSubmit={handleSubmit} className="p-6 grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div className="space-y-2">
+                        <label className="text-sm font-semibold flex items-center gap-2">
+                            <Hash size={14} className="text-muted-foreground" /> Número
+                        </label>
+                        <input
+                            type="text" required
+                            className="w-full px-4 py-2.5 border border-border rounded-xl font-mono text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                            value={formData.numero}
+                            onChange={e => setFormData({ ...formData, numero: e.target.value })}
+                            placeholder="Ej. 001-00523"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-sm font-semibold flex items-center gap-2">
+                            <Calendar size={14} className="text-muted-foreground" /> Fecha
+                        </label>
+                        <input
+                            type="date" required
+                            className="w-full px-4 py-2.5 border border-border rounded-xl text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                            value={formData.fecha}
+                            onChange={e => setFormData({ ...formData, fecha: e.target.value })}
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-sm font-semibold flex items-center gap-2">
+                            <Truck size={14} className="text-muted-foreground" /> Proveedor
+                        </label>
+                        <input
+                            type="text"
+                            className="w-full px-4 py-2.5 border border-border rounded-xl text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                            value={formData.proveedor || ""}
+                            onChange={e => setFormData({ ...formData, proveedor: e.target.value })}
+                            placeholder="Nombre de la empresa"
+                        />
+                    </div>
+                    <div className="flex items-end gap-2">
+                        {editMode && (
+                            <button
+                                type="button"
+                                onClick={resetForm}
+                                className="px-4 py-2.5 border border-border text-muted-foreground hover:bg-secondary rounded-xl transition-all"
+                            >
+                                <X size={20} />
+                            </button>
+                        )}
+                        <button
+                            type="submit"
+                            disabled={actionLoading}
+                            className="flex-1 bg-primary text-primary-foreground py-2.5 rounded-xl font-bold text-sm hover:opacity-90 active:scale-95 transition-all shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                            {actionLoading ? "Procesando..." : editMode ? "Actualizar Factura" : "Registrar Factura"}
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            {/* Listado con Buscador y Paginación */}
+            <div className="space-y-4">
+                <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                    <div className="relative w-full md:w-96">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
+                        <input
+                            type="text"
+                            placeholder="Buscar por número o proveedor..."
+                            value={searchQuery}
+                            onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                            className="w-full pl-10 pr-4 py-2.5 bg-white border border-border rounded-2xl focus:ring-2 focus:ring-primary/20 outline-none shadow-sm transition-all"
+                        />
+                    </div>
+                    
+                    {totalPages > 1 && (
+                        <div className="flex items-center gap-2 bg-white border border-border p-1 rounded-xl shadow-sm">
+                            <button
+                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                disabled={currentPage === 1}
+                                className="p-2 hover:bg-secondary rounded-lg disabled:opacity-30 transition-colors"
+                            >
+                                <ChevronLeft size={18} />
+                            </button>
+                            <span className="text-xs font-bold px-3">
+                                Página {currentPage} de {totalPages}
+                            </span>
+                            <button
+                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                disabled={currentPage === totalPages}
+                                className="p-2 hover:bg-secondary rounded-lg disabled:opacity-30 transition-colors"
+                            >
+                                <ChevronRight size={18} />
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {loading ? (
+                        Array.from({ length: 4 }).map((_, i) => (
+                            <div key={i} className="h-32 bg-white border border-border rounded-2xl animate-pulse" />
+                        ))
+                    ) : filteredFacturas.length === 0 ? (
+                        <div className="col-span-full py-12 bg-white border border-border rounded-3xl text-center text-muted-foreground italic">
+                            No se encontraron facturas registradas.
+                        </div>
+                    ) : (
+                        paginatedFacturas.map(f => (
+                            <div key={f.id} className="bg-white border border-border rounded-2xl p-5 shadow-sm hover:shadow-md transition-all group relative overflow-hidden">
+                                <div className="absolute top-0 right-0 p-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button
+                                        onClick={() => handleEdit(f)}
+                                        className="p-1.5 bg-secondary text-muted-foreground hover:text-primary rounded-lg transition-colors"
+                                    >
+                                        <Pencil size={14} />
+                                    </button>
+                                    <button
+                                        onClick={() => setConfirmDeleteId(f.id!)}
+                                        className="p-1.5 bg-red-50 text-red-400 hover:text-red-600 rounded-lg transition-colors"
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
+                                </div>
+                                <div className="flex items-start gap-4">
+                                    <div className="p-3 bg-primary/5 rounded-xl text-primary">
+                                        <FileText size={24} />
+                                    </div>
+                                    <div className="space-y-1 pr-12">
+                                        <p className="font-mono font-bold text-sm text-foreground truncate">{f.numero}</p>
+                                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                            <Calendar size={12} /> {f.fecha}
+                                        </p>
+                                        {f.proveedor && (
+                                            <p className="text-xs font-semibold text-primary mt-2 truncate">
+                                                {f.proveedor}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </div>
+
+            <ConfirmModal 
+                isOpen={!!confirmDeleteId}
+                onClose={() => setConfirmDeleteId(null)}
+                onConfirm={handleDelete}
+                title="¿Eliminar factura?"
+                description="Esta acción desvinculará los movimientos asociados a esta factura, pero no los eliminará del historial."
+                variant="danger"
+                confirmText="Eliminar permanentemente"
+                loading={actionLoading}
+            />
+        </div>
+    );
+}

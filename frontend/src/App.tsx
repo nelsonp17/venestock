@@ -5,6 +5,7 @@ import { TasaWidget } from "./components/TasaWidget";
 import { cn } from "./lib/utils";
 import { InventoryView } from "./views/InventoryView";
 import { MovementsView } from "./views/MovementsView";
+import { FacturasView } from "./views/FacturasView";
 import { DatabaseView } from "./views/DatabaseView";
 import { CategoriesView } from "./views/CategoriesView";
 import { DashboardView } from "./views/DashboardView";
@@ -23,7 +24,10 @@ function App() {
           <InventoryView active={activeTab === "inventory"} />
         </div>
         <div className={cn("transition-all duration-300", activeTab === "movements" ? "block" : "hidden")}>
-          <MovementsView active={activeTab === "movements"} />
+          <MovementsView active={activeTab === "movements"} onNavigateToFacturas={() => setActiveTab("facturas")} />
+        </div>
+        <div className={cn("transition-all duration-300", activeTab === "facturas" ? "block" : "hidden")}>
+          <FacturasView active={activeTab === "facturas"} />
         </div>
         <div className={cn("transition-all duration-300", activeTab === "categories" ? "block" : "hidden")}>
           <CategoriesView active={activeTab === "categories"} />

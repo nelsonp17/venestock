@@ -1,10 +1,11 @@
-import { LayoutDashboard, Package, History, Database, Tags, Info } from "lucide-react";
+import { LayoutDashboard, Package, History, FileText, Database, Tags, Info } from "lucide-react";
 import { cn } from "../lib/utils";
 
 const menuItems = [
     { icon: LayoutDashboard, label: "Dashboard", id: "dashboard" },
     { icon: Package, label: "Inventario", id: "inventory" },
     { icon: History, label: "Movimientos", id: "movements" },
+    { icon: FileText, label: "Facturas", id: "facturas" },
     { icon: Tags, label: "Categorías", id: "categories" },
     { icon: Database, label: "Base de Datos", id: "database" },
     { icon: Info, label: "Acerca de", id: "about" },
@@ -14,7 +15,7 @@ export function Sidebar({ activeTab, onTabChange }: { activeTab: string, onTabCh
     return (
         <div className="w-64 h-screen bg-white border-r border-border flex flex-col">
             <div className="p-6">
-                <h1 className="text-2xl font-bold text-primary">SGM Venestock</h1>
+                <h1 className="text-2xl font-bold text-primary">SGM VeneStock</h1>
             </div>
 
             <nav className="flex-1 px-4">
