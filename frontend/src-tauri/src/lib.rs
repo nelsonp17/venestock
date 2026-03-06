@@ -630,6 +630,30 @@ async fn get_factura_items(state: State<'_, AppState>, factura_id: i32) -> Resul
     Ok(items)
 }
 
+#[tauri::command]
+async fn get_machine_id() -> Result<String, String> {
+    use std::process::Command;
+    
+    // En Windows obtenemos el UUID de la BIOS/Sistema
+    let output = if cfg!(target_os = "windows") {
+        Command::new("wmic")
+            .args(["csproduct", "get", "uuid"])
+            .output()
+            .map_err(|e| e.to_string())?
+    } else {
+        // Fallback para otros sistemas o si wmic falla
+        return Ok("dev-machine-id".to_string());
+    };
+
+    let result = String::from_utf8_lossy(&output.stdout);
+    let lines: Vec<&str> = result.lines().collect();
+    if lines.len() >= 2 {
+        Ok(lines[1].trim().to_string())
+    } else {
+        Ok("unknown-id".to_string())
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -667,7 +691,8 @@ pub fn run() {
             get_facturas,
             upsert_factura,
             delete_factura,
-            get_factura_items
+            get_factura_items,
+            get_machine_id
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,15 +1,28 @@
-import { Info, Code, Shield, Mail, ExternalLink } from "lucide-react";
+import { Info, Code, Shield, Mail, ExternalLink, Key, CheckCircle, XCircle } from "lucide-react";
+import { useState, useEffect } from "react";
 
 export function AboutView({ active }: { active: boolean }) {
+    const [license, setLicense] = useState<any>(null);
+
+    useEffect(() => {
+        const saved = localStorage.getItem('venestock_license');
+        if (saved) {
+            try {
+                setLicense(JSON.parse(saved));
+            } catch (e) {
+                console.error("Error parsing license:", e);
+            }
+        }
+    }, [active]);
+
     if (!active) return null;
 
     return (
         <div className="p-8 max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {/* Header */}
+            {/* ... Resto del header ... */}
             <div className="text-center space-y-4 mb-12">
                 <div className="w-24 h-24 bg-primary/10 rounded-3xl mx-auto flex items-center justify-center mb-6 shadow-sm border border-primary/20">
                     <img src="/public/tauri.png" alt="Logo" className="w-16 h-16 object-contain opacity-80" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-                    {/* <Computer size={48} className="text-primary" /> */}
                 </div>
                 <h2 className="text-4xl font-extrabold tracking-tight">SGM VeneStock</h2>
                 <p className="text-xl text-muted-foreground font-medium">Sistema de Gestión de Inventario</p>
@@ -19,6 +32,47 @@ export function AboutView({ active }: { active: boolean }) {
                         <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
                     </span>
                     <span className="text-sm font-semibold tracking-wider text-muted-foreground">V 0.1.0</span>
+                </div>
+            </div>
+
+            {/* License Information Card */}
+            <div className="bg-gradient-to-br from-primary to-primary/80 p-8 rounded-3xl text-white shadow-xl shadow-primary/20 overflow-hidden relative group">
+                <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform">
+                    <Shield size={120} />
+                </div>
+                <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-6">
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2">
+                            <Key size={20} className="text-primary-foreground/70" />
+                            <span className="text-sm font-bold uppercase tracking-widest text-primary-foreground/80">Información de Licencia</span>
+                        </div>
+                        <div>
+                            <h3 className="text-3xl font-black">{license?.owner_name || "Versión No Activada"}</h3>
+                            <p className="text-primary-foreground/80 font-mono mt-1">
+                                {license?.key ? `Key: ${license.key}` : "Requiere una llave de producto válida"}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md px-6 py-4 rounded-2xl border border-white/20">
+                        {license?.status === 'active' ? (
+                            <>
+                                <CheckCircle size={32} className="text-emerald-300" />
+                                <div className="text-left">
+                                    <p className="text-xs font-bold uppercase tracking-wider text-emerald-100/70">Estado</p>
+                                    <p className="text-lg font-black text-emerald-300">ACTIVA</p>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <XCircle size={32} className="text-red-300" />
+                                <div className="text-left">
+                                    <p className="text-xs font-bold uppercase tracking-wider text-red-100/70">Estado</p>
+                                    <p className="text-lg font-black text-red-300">INACTIVA</p>
+                                </div>
+                            </>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -35,6 +89,7 @@ export function AboutView({ active }: { active: boolean }) {
                         y la experiencia del usuario, permitiendo gestionar el catálogo de productos con tasas multi-divisa (USD/Bs).
                     </p>
                 </div>
+                {/* ... resto de cards (Code, Shield, Mail) ... */}
 
                 {/* Tech Card */}
                 <div className="bg-white p-8 rounded-3xl border border-border shadow-sm hover:shadow-md transition-shadow">
