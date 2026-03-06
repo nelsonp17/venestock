@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
     FileText, Pencil, Trash2, X, FilePlus, Search,
-    ChevronLeft, ChevronRight, Hash, Calendar, Truck, ArrowLeft, Package, DollarSign
+    ChevronLeft, ChevronRight, Hash, Calendar, Truck, ArrowLeft, Package
 } from "lucide-react";
 import { Factura, FacturaItem } from "../types";
 import { toast } from "react-hot-toast";
@@ -227,11 +227,10 @@ export function FacturasView({ active }: { active: boolean }) {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${
-                                                item.tipo === 'ENTRADA' 
-                                                    ? 'bg-emerald-100 text-emerald-700' 
+                                            <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${item.tipo === 'ENTRADA'
+                                                    ? 'bg-emerald-100 text-emerald-700'
                                                     : 'bg-orange-100 text-orange-700'
-                                            }`}>
+                                                }`}>
                                                 {item.tipo}
                                             </span>
                                         </td>
@@ -389,8 +388,8 @@ export function FacturasView({ active }: { active: boolean }) {
                         </div>
                     ) : (
                         paginatedFacturas.map(f => (
-                            <div 
-                                key={f.id} 
+                            <div
+                                key={f.id}
                                 onClick={() => handleSelectFactura(f)}
                                 className="bg-white border border-border rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-primary/30 transition-all group relative overflow-hidden cursor-pointer active:scale-95"
                             >
