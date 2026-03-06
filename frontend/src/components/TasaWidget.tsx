@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { DollarSign, RefreshCcw, ChevronRight, ChevronLeft } from "lucide-react";
+import { RefreshCcw, ChevronRight, ChevronLeft } from "lucide-react";
 import { formatCurrency, cn } from "../lib/utils";
 import { TasaConfirmModal } from "./TasaConfirmModal";
 import { toast } from "react-hot-toast";

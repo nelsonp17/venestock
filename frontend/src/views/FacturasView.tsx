@@ -1,10 +1,9 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { 
-    FileText, Pencil, Trash2, X, FilePlus, Search, 
-    ChevronLeft, ChevronRight, Hash, Calendar, Truck 
+import {
+    FileText, Pencil, Trash2, X, FilePlus, Search,
+    ChevronLeft, ChevronRight, Hash, Calendar, Truck
 } from "lucide-react";
-import { cn } from "../lib/utils";
 import { Factura } from "../types";
 import { toast } from "react-hot-toast";
 import { ConfirmModal } from "../components/ConfirmModal";
@@ -16,7 +15,7 @@ export function FacturasView({ active }: { active: boolean }) {
     const [editMode, setEditMode] = useState(false);
     const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
-    
+
     // Paginación
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 8;
@@ -109,7 +108,7 @@ export function FacturasView({ active }: { active: boolean }) {
     if (!active) return null;
 
     // Filtrado y Paginación
-    const filteredFacturas = facturas.filter(f => 
+    const filteredFacturas = facturas.filter(f =>
         f.numero.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (f.proveedor?.toLowerCase() || "").includes(searchQuery.toLowerCase())
     );
@@ -205,7 +204,7 @@ export function FacturasView({ active }: { active: boolean }) {
                             className="w-full pl-10 pr-4 py-2.5 bg-white border border-border rounded-2xl focus:ring-2 focus:ring-primary/20 outline-none shadow-sm transition-all"
                         />
                     </div>
-                    
+
                     {totalPages > 1 && (
                         <div className="flex items-center gap-2 bg-white border border-border p-1 rounded-xl shadow-sm">
                             <button
@@ -277,7 +276,7 @@ export function FacturasView({ active }: { active: boolean }) {
                 </div>
             </div>
 
-            <ConfirmModal 
+            <ConfirmModal
                 isOpen={!!confirmDeleteId}
                 onClose={() => setConfirmDeleteId(null)}
                 onConfirm={handleDelete}

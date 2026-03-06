@@ -33,7 +33,7 @@ interface ChartItem {
 }
 
 // ── Tooltip personalizado para recharts ────────────────────────────────────────
-function CustomTooltip({ active, payload, label }: any) {
+function CustomTooltip({ active, payload }: any) {
     if (active && payload && payload.length) {
         const d: ChartItem = payload[0].payload;
         return (

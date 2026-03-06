@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Plus, Search, Edit2, Trash2, Calculator, Barcode, FileText, FileSpreadsheet, ChevronLeft, ChevronRight } from "lucide-react";
-import { formatCurrency } from "../lib/utils";
+import { Plus, Search, Edit2, Trash2, Calculator, QrCode, FileText, FileSpreadsheet, ChevronLeft, ChevronRight } from "lucide-react";
+import { formatCurrency, cn } from "../lib/utils";
 import { ProductModal } from "./ProductModal.tsx";
 import { LabelModal } from "./LabelModal.tsx";
 import { RecalculateModal } from "./RecalculateModal.tsx";
@@ -20,7 +20,7 @@ export function InventoryView({ active }: { active?: boolean }) {
     const [labelOpen, setLabelOpen] = useState(false);
     const [recalculateOpen, setRecalculateOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Producto | null>(null);
-    const [selectedProduct, setSelectedProduct] = useState<Producto | null>(null);
+    const [selectedIds, setSelectedIds] = useState<number[]>([]);
     const [productToDelete, setProductToDelete] = useState<Producto | null>(null);
 
     // Paginación
@@ -36,6 +36,20 @@ export function InventoryView({ active }: { active?: boolean }) {
             console.error("Error fetching products:", error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const toggleSelection = (id: number) => {
+        setSelectedIds(prev => 
+            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+        );
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedIds.length === paginatedProducts.length && paginatedProducts.length > 0) {
+            setSelectedIds([]);
+        } else {
+            setSelectedIds(paginatedProducts.map(p => p.id!));
         }
     };
 
@@ -135,6 +149,7 @@ export function InventoryView({ active }: { active?: boolean }) {
     // Resetear a la primera página cuando se busca
     useEffect(() => {
         setCurrentPage(1);
+        setSelectedIds([]);
     }, [search]);
 
     const filtered = productos.filter(p =>
@@ -149,6 +164,8 @@ export function InventoryView({ active }: { active?: boolean }) {
         currentPage * itemsPerPage
     );
 
+    const selectedProducts = productos.filter(p => selectedIds.includes(p.id!));
+
     return (
         <div className="p-8">
             <div className="flex justify-between items-center mb-8">
@@ -157,6 +174,15 @@ export function InventoryView({ active }: { active?: boolean }) {
                     <p className="text-muted-foreground mt-1">Gestiona tus productos y actualiza precios en lote.</p>
                 </div>
                 <div className="flex space-x-3">
+                    {selectedIds.length > 0 && (
+                        <button
+                            onClick={() => setLabelOpen(true)}
+                            className="flex items-center space-x-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl transition-all font-bold shadow-lg shadow-primary/20 active:scale-95 animate-in zoom-in"
+                        >
+                            <QrCode size={18} />
+                            <span>Imprimir QR ({selectedIds.length})</span>
+                        </button>
+                    )}
                     <button
                         onClick={() => setRecalculateOpen(true)}
                         className="flex items-center space-x-2 px-4 py-2 bg-white border border-primary text-primary hover:bg-gray-200 rounded-xl transition-colors font-medium active:scale-95"
@@ -204,6 +230,14 @@ export function InventoryView({ active }: { active?: boolean }) {
                     <table className="w-full text-left">
                         <thead>
                             <tr className="bg-secondary/5 text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
+                                <th className="px-6 py-4 text-center w-10">
+                                    <input 
+                                        type="checkbox"
+                                        className="w-4 h-4 rounded border-border text-primary focus:ring-primary/20"
+                                        checked={selectedIds.length === paginatedProducts.length && paginatedProducts.length > 0}
+                                        onChange={toggleSelectAll}
+                                    />
+                                </th>
                                 <th className="px-6 py-4 font-semibold">Código</th>
                                 <th className="px-6 py-4 font-semibold">Producto</th>
                                 <th className="px-6 py-4 font-semibold text-right">Ref ($)</th>
@@ -216,14 +250,25 @@ export function InventoryView({ active }: { active?: boolean }) {
                         <tbody className="divide-y divide-border">
                             {loading ? (
                                 <tr>
-                                    <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">Cargando productos...</td>
+                                    <td colSpan={8} className="px-6 py-12 text-center text-muted-foreground">Cargando productos...</td>
                                 </tr>
                             ) : paginatedProducts.length === 0 ? (
                                 <tr>
-                                    <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">No se encontraron productos.</td>
+                                    <td colSpan={8} className="px-6 py-12 text-center text-muted-foreground">No se encontraron productos.</td>
                                 </tr>
                             ) : paginatedProducts.map((p) => (
-                                <tr key={p.id} className="hover:bg-secondary/5 transition-colors group">
+                                <tr key={p.id} className={cn(
+                                    "hover:bg-secondary/5 transition-colors group",
+                                    selectedIds.includes(p.id!) && "bg-primary/5"
+                                )}>
+                                    <td className="px-6 py-4 text-center">
+                                        <input 
+                                            type="checkbox"
+                                            className="w-4 h-4 rounded border-border text-primary focus:ring-primary/20"
+                                            checked={selectedIds.includes(p.id!)}
+                                            onChange={() => toggleSelection(p.id!)}
+                                        />
+                                    </td>
                                     <td className="px-6 py-4 font-mono text-xs">{p.codigo}</td>
                                     <td className="px-6 py-4">
                                         <div className="font-medium text-foreground">{p.nombre}</div>
@@ -251,11 +296,6 @@ export function InventoryView({ active }: { active?: boolean }) {
                                                 className="p-1.5 text-muted-foreground hover:text-primary transition-colors"
                                             >
                                                 <Edit2 size={16} />
-                                            </button>
-                                            <button
-                                                onClick={() => { setSelectedProduct(p); setLabelOpen(true); }}
-                                                className="p-1.5 text-muted-foreground hover:text-primary transition-colors">
-                                                <Barcode size={16} />
                                             </button>
                                             <button
                                                 onClick={() => setProductToDelete(p)}
@@ -308,8 +348,8 @@ export function InventoryView({ active }: { active?: boolean }) {
 
             <LabelModal
                 isOpen={labelOpen}
-                onClose={() => setLabelOpen(false)}
-                product={selectedProduct}
+                onClose={() => { setLabelOpen(false); setSelectedIds([]); }}
+                products={selectedProducts}
             />
 
             <RecalculateModal

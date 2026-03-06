@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Plus, ArrowUpRight, ArrowDownLeft, Calendar, Search, FileText, Pencil, Trash2, X, FilePlus, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, ArrowUpRight, ArrowDownLeft, Search, FileText, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn, formatCurrency } from "../lib/utils";
 import { Movimiento, Producto, Factura } from "../types";
 import { toast } from "react-hot-toast";
