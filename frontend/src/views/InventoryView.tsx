@@ -9,6 +9,8 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { Producto } from "../types";
+import toast from "react-hot-toast";
+import { ConfirmModal } from "../components/ConfirmModal";
 
 export function InventoryView({ active }: { active?: boolean }) {
     const [productos, setProductos] = useState<Producto[]>([]);
@@ -19,6 +21,7 @@ export function InventoryView({ active }: { active?: boolean }) {
     const [recalculateOpen, setRecalculateOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Producto | null>(null);
     const [selectedProduct, setSelectedProduct] = useState<Producto | null>(null);
+    const [productToDelete, setProductToDelete] = useState<Producto | null>(null);
 
     const fetchProductos = async () => {
         setLoading(true);
@@ -32,15 +35,17 @@ export function InventoryView({ active }: { active?: boolean }) {
         }
     };
 
-    const handleDeleteProduct = async (id: number, nombre: string) => {
-        if (!confirm(`¿Está seguro que desea eliminar el producto "${nombre}"?\nEsta acción no se puede deshacer y podría afectar el historial de movimientos si no hace limpieza de base de datos.`)) return;
-
+    const executeDeleteProduct = async () => {
+        if (!productToDelete) return;
         try {
-            await invoke("delete_producto", { id });
+            await invoke("delete_producto", { id: productToDelete.id });
+            toast.success("Producto eliminado");
             await fetchProductos();
         } catch (error) {
             console.error("Error deleting product:", error);
-            alert("Error al eliminar el producto: " + error);
+            toast.error("Error al eliminar el producto");
+        } finally {
+            setProductToDelete(null);
         }
     };
 
@@ -48,7 +53,7 @@ export function InventoryView({ active }: { active?: boolean }) {
         try {
             await invoke("recalculate_prices", { tasa });
             await fetchProductos();
-            // alert("Precios actualizados con éxito");
+            toast.success("Precios actualizados con éxito");
         } catch (error) {
             throw error; // Let the modal handle it
         }
@@ -56,7 +61,6 @@ export function InventoryView({ active }: { active?: boolean }) {
 
     const exportToPDF = async () => {
         try {
-            console.log("Iniciando exportación a PDF (Backend)...");
             const doc = new jsPDF();
             doc.text("Reporte de Inventario - SGM Venestock", 14, 15);
 
@@ -78,15 +82,15 @@ export function InventoryView({ active }: { active?: boolean }) {
             const base64 = dataUri.split(",")[1];
             const fileName = `inventario_${new Date().toISOString().split('T')[0]}.pdf`;
 
-            const path: string = await invoke("save_export_file", {
+            await invoke("save_export_file", {
                 filename: fileName,
                 base64Data: base64
             });
 
-            alert(`PDF guardado con éxito en su carpeta de Descargas:\n${path}`);
+            toast.success("PDF guardado en Descargas");
         } catch (error) {
             console.error("Error al exportar PDF:", error);
-            alert("No se pudo generar el PDF. Error: " + error);
+            toast.error("No se pudo generar el PDF");
         }
     };
 
@@ -106,15 +110,15 @@ export function InventoryView({ active }: { active?: boolean }) {
             const excelBase64 = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
             const fileName = `inventario_${new Date().toISOString().split('T')[0]}.xlsx`;
 
-            const path: string = await invoke("save_export_file", {
+            await invoke("save_export_file", {
                 filename: fileName,
                 base64Data: excelBase64
             });
 
-            alert(`Excel guardado con éxito en su carpeta de Descargas:\n${path}`);
+            toast.success("Excel guardado en Descargas");
         } catch (error) {
             console.error("Error al exportar Excel:", error);
-            alert("No se pudo generar el Excel. Error: " + error);
+            toast.error("No se pudo generar el Excel");
         }
     };
 
@@ -140,7 +144,7 @@ export function InventoryView({ active }: { active?: boolean }) {
                 <div className="flex space-x-3">
                     <button
                         onClick={() => setRecalculateOpen(true)}
-                        className="flex items-center space-x-2 px-4 py-2 border border-primary text-primary hover:bg-primary/5 rounded-xl transition-colors font-medium"
+                        className="flex items-center space-x-2 px-4 py-2 border border-primary text-primary hover:bg-primary/5 rounded-xl transition-colors font-medium active:scale-95"
                     >
                         <Calculator size={18} />
                         <span>Recalcular Precios</span>
@@ -197,11 +201,11 @@ export function InventoryView({ active }: { active?: boolean }) {
                         <tbody className="divide-y divide-border">
                             {loading ? (
                                 <tr>
-                                    <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">Cargando productos...</td>
+                                    <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">Cargando productos...</td>
                                 </tr>
                             ) : filtered.length === 0 ? (
                                 <tr>
-                                    <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">No se encontraron productos.</td>
+                                    <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">No se encontraron productos.</td>
                                 </tr>
                             ) : filtered.map((p) => (
                                 <tr key={p.id} className="hover:bg-secondary/5 transition-colors group">
@@ -222,7 +226,7 @@ export function InventoryView({ active }: { active?: boolean }) {
                                             <span>Bs/$</span>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 text-center">
+                                    <td className="px-6 py-4 text-center font-bold">
                                         {p.stock}
                                     </td>
                                     <td className="px-6 py-4">
@@ -239,7 +243,7 @@ export function InventoryView({ active }: { active?: boolean }) {
                                                 <Barcode size={16} />
                                             </button>
                                             <button
-                                                onClick={() => handleDeleteProduct(p.id!, p.nombre)}
+                                                onClick={() => setProductToDelete(p)}
                                                 className="p-1.5 text-muted-foreground hover:text-destructive transition-colors">
                                                 <Trash2 size={16} />
                                             </button>
@@ -269,6 +273,16 @@ export function InventoryView({ active }: { active?: boolean }) {
                 isOpen={recalculateOpen}
                 onClose={() => setRecalculateOpen(false)}
                 onConfirm={handleRecalculate}
+            />
+
+            <ConfirmModal
+                isOpen={!!productToDelete}
+                onClose={() => setProductToDelete(null)}
+                onConfirm={executeDeleteProduct}
+                title="¿Eliminar producto?"
+                description={`¿Está seguro que desea eliminar "${productToDelete?.nombre}"? Esta acción no se puede deshacer y borrará permanentemente el registro.`}
+                variant="danger"
+                confirmText="Eliminar"
             />
         </div>
     );

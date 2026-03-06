@@ -1,6 +1,6 @@
+use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
-use chrono::NaiveDateTime;
 
 #[derive(Debug, Serialize, Deserialize, FromRow, Clone)]
 pub struct Producto {
@@ -36,6 +36,7 @@ pub struct Movimiento {
     pub total_bs: f64,
     pub price_per_dolar: f64,
     pub fecha: Option<NaiveDateTime>,
+    pub factura_id: Option<i32>,
 }
 
 #[derive(Debug, Serialize, Deserialize, FromRow, Clone)]
@@ -49,4 +50,14 @@ pub struct Subcategoria {
     pub id: Option<i32>,
     pub nombre: String,
     pub categoria_id: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize, FromRow, Clone)]
+pub struct Factura {
+    pub id: Option<i32>,
+    pub numero: String,
+    pub fecha: String,
+    pub proveedor: Option<String>,
+    pub observaciones: Option<String>,
+    pub created_at: Option<String>,
 }

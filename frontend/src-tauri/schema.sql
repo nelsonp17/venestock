@@ -32,6 +32,15 @@ CREATE TABLE IF NOT EXISTS subcategorias (
     UNIQUE(nombre, categoria_id)
 );
 
+CREATE TABLE IF NOT EXISTS facturas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    numero TEXT UNIQUE NOT NULL,
+    fecha DATE NOT NULL,
+    proveedor TEXT,
+    observaciones TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS movimientos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     producto_id INTEGER NOT NULL,
@@ -42,7 +51,9 @@ CREATE TABLE IF NOT EXISTS movimientos (
     total_bs REAL NOT NULL,
     price_per_dolar REAL NOT NULL DEFAULT 1.0,
     fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(producto_id) REFERENCES productos(id)
+    factura_id INTEGER,
+    FOREIGN KEY(producto_id) REFERENCES productos(id),
+    FOREIGN KEY(factura_id) REFERENCES facturas(id)
 );
 
 -- Insert an initial rate if none exists

@@ -2,7 +2,7 @@ mod db;
 mod models;
 mod scraper;
 
-use models::{Producto, Tasa, Movimiento};
+use models::{Producto, Tasa, Movimiento, Factura};
 use sqlx::SqlitePool;
 use tauri::{Manager, State};
 use base64::{Engine as _, engine::general_purpose};
@@ -257,7 +257,7 @@ async fn record_movement(state: State<'_, AppState>, mut mov: Movimiento) -> Res
     let final_fecha = mov.fecha.unwrap_or(now);
     mov.fecha = Some(final_fecha);
 
-    sqlx::query("INSERT INTO movimientos (producto_id, tipo, cantidad, tasa_momento, total_usd, total_bs, price_per_dolar, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+    sqlx::query("INSERT INTO movimientos (producto_id, tipo, cantidad, tasa_momento, total_usd, total_bs, price_per_dolar, fecha, factura_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
         .bind(mov.producto_id)
         .bind(&mov.tipo)
         .bind(mov.cantidad)
@@ -266,6 +266,7 @@ async fn record_movement(state: State<'_, AppState>, mut mov: Movimiento) -> Res
         .bind(mov.total_bs)
         .bind(mov.price_per_dolar)
         .bind(final_fecha)
+        .bind(mov.factura_id)
         .execute(&mut *tx)
         .await
         .map_err(|e| e.to_string())?;
@@ -412,7 +413,7 @@ async fn import_data(
     }
 
     for mov in movimientos {
-         sqlx::query("INSERT OR REPLACE INTO movimientos (id, producto_id, tipo, cantidad, tasa_momento, total_usd, total_bs, price_per_dolar, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+         sqlx::query("INSERT OR REPLACE INTO movimientos (id, producto_id, tipo, cantidad, tasa_momento, total_usd, total_bs, price_per_dolar, fecha, factura_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
             .bind(mov.id)
             .bind(mov.producto_id)
             .bind(mov.tipo)
@@ -422,6 +423,7 @@ async fn import_data(
             .bind(mov.total_bs)
             .bind(mov.price_per_dolar)
             .bind(mov.fecha)
+            .bind(mov.factura_id)
             .execute(&mut *tx)
             .await
             .map_err(|e| e.to_string())?;
@@ -534,6 +536,52 @@ async fn delete_subcategoria(state: State<'_, AppState>, id: i32) -> Result<(), 
     Ok(())
 }
 
+// ── Facturas CRUD ────────────────────────────────────────────────────────────
+
+#[tauri::command]
+async fn get_facturas(state: State<'_, AppState>) -> Result<Vec<Factura>, String> {
+    sqlx::query_as::<_, Factura>("SELECT * FROM facturas ORDER BY fecha DESC")
+        .fetch_all(&state.db)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn upsert_factura(state: State<'_, AppState>, mut factura: Factura) -> Result<Factura, String> {
+    if let Some(id) = factura.id {
+        sqlx::query("UPDATE facturas SET numero = ?, fecha = ?, proveedor = ?, observaciones = ? WHERE id = ?")
+            .bind(&factura.numero)
+            .bind(&factura.fecha)
+            .bind(&factura.proveedor)
+            .bind(&factura.observaciones)
+            .bind(id)
+            .execute(&state.db)
+            .await
+            .map_err(|e| e.to_string())?;
+    } else {
+        let result = sqlx::query("INSERT INTO facturas (numero, fecha, proveedor, observaciones) VALUES (?, ?, ?, ?)")
+            .bind(&factura.numero)
+            .bind(&factura.fecha)
+            .bind(&factura.proveedor)
+            .bind(&factura.observaciones)
+            .execute(&state.db)
+            .await
+            .map_err(|e| e.to_string())?;
+        factura.id = Some(result.last_insert_rowid() as i32);
+    }
+    Ok(factura)
+}
+
+#[tauri::command]
+async fn delete_factura(state: State<'_, AppState>, id: i32) -> Result<(), String> {
+    sqlx::query("DELETE FROM facturas WHERE id = ?")
+        .bind(id)
+        .execute(&state.db)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -567,7 +615,10 @@ pub fn run() {
             get_subcategorias,
             upsert_subcategoria,
             delete_subcategoria,
-            get_dashboard_stats
+            get_dashboard_stats,
+            get_facturas,
+            upsert_factura,
+            delete_factura
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

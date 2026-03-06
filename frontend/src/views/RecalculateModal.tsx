@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { X, Calculator, Globe, Edit3, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "../lib/utils";
+import { toast } from "react-hot-toast";
 
 interface RecalculateModalProps {
     isOpen: boolean;
@@ -38,7 +39,7 @@ export function RecalculateModal({ isOpen, onClose, onConfirm }: RecalculateModa
     const handleConfirm = async () => {
         const rate = method === 'bcv' ? bcvRate : parseFloat(customRate);
         if (isNaN(rate) || rate <= 0) {
-            alert("Por favor ingrese una tasa válida");
+            toast.error("Por favor ingrese una tasa válida");
             return;
         }
 
@@ -47,7 +48,7 @@ export function RecalculateModal({ isOpen, onClose, onConfirm }: RecalculateModa
             await onConfirm(rate);
             onClose();
         } catch (error) {
-            alert("Error al recalcular: " + error);
+            toast.error("Error al recalcular: " + error);
         } finally {
             setProcessing(false);
         }

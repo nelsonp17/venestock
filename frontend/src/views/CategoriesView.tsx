@@ -3,6 +3,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { Plus, Pencil, Trash2, Tags, FolderTree, X, Save, ChevronRight } from "lucide-react";
 import { cn } from "../lib/utils";
 import { SearchableSelect } from "../components/SearchableSelect";
+import { toast } from "react-hot-toast";
+import { ConfirmModal } from "../components/ConfirmModal";
 
 interface Categoria {
     id: number | null;
@@ -29,6 +31,7 @@ function CategoriaModal({
     categoria: Categoria | null;
 }) {
     const [nombre, setNombre] = useState("");
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         setNombre(categoria?.nombre ?? "");
@@ -36,14 +39,18 @@ function CategoriaModal({
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setLoading(true);
         try {
             await invoke("upsert_categoria", {
                 categoria: { id: categoria?.id ?? null, nombre },
             });
+            toast.success(categoria ? "Categoría actualizada" : "Categoría creada");
             onSave();
             onClose();
         } catch (err) {
-            alert("Error al guardar categoría: " + err);
+            toast.error("Error al guardar categoría: " + err);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -73,16 +80,18 @@ function CategoriaModal({
                         <button
                             type="button"
                             onClick={onClose}
+                            disabled={loading}
                             className="px-5 py-2 border border-border text-muted-foreground hover:bg-secondary rounded-xl transition-colors text-sm"
                         >
                             Cancelar
                         </button>
                         <button
                             type="submit"
-                            className="px-5 py-2 bg-primary text-primary-foreground hover:opacity-90 rounded-xl transition-all flex items-center gap-2 text-sm font-semibold"
+                            disabled={loading}
+                            className="px-5 py-2 bg-primary text-primary-foreground hover:opacity-90 rounded-xl transition-all flex items-center gap-2 text-sm font-semibold disabled:opacity-50"
                         >
                             <Save size={15} />
-                            Guardar
+                            {loading ? "Guardando..." : "Guardar"}
                         </button>
                     </div>
                 </form>
@@ -106,6 +115,7 @@ function SubcategoriaModal({
 }) {
     const [nombre, setNombre] = useState("");
     const [categoriaId, setCategoriaId] = useState<number | null>(null);
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         setNombre(subcategoria?.nombre ?? "");
@@ -114,7 +124,8 @@ function SubcategoriaModal({
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!categoriaId) return alert("Selecciona una categoría padre.");
+        if (!categoriaId) return toast.error("Selecciona una categoría padre.");
+        setLoading(true);
         try {
             await invoke("upsert_subcategoria", {
                 subcategoria: {
@@ -123,10 +134,13 @@ function SubcategoriaModal({
                     categoria_id: categoriaId,
                 },
             });
+            toast.success(subcategoria ? "Subcategoría actualizada" : "Subcategoría creada");
             onSave();
             onClose();
         } catch (err) {
-            alert("Error al guardar subcategoría: " + err);
+            toast.error("Error al guardar subcategoría: " + err);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -169,16 +183,18 @@ function SubcategoriaModal({
                         <button
                             type="button"
                             onClick={onClose}
+                            disabled={loading}
                             className="px-5 py-2 border border-border text-muted-foreground hover:bg-secondary rounded-xl transition-colors text-sm"
                         >
                             Cancelar
                         </button>
                         <button
                             type="submit"
-                            className="px-5 py-2 bg-primary text-primary-foreground hover:opacity-90 rounded-xl transition-all flex items-center gap-2 text-sm font-semibold"
+                            disabled={loading}
+                            className="px-5 py-2 bg-primary text-primary-foreground hover:opacity-90 rounded-xl transition-all flex items-center gap-2 text-sm font-semibold disabled:opacity-50"
                         >
                             <Save size={15} />
-                            Guardar
+                            {loading ? "Guardando..." : "Guardar"}
                         </button>
                     </div>
                 </form>
@@ -196,6 +212,8 @@ export function CategoriesView({ active }: { active: boolean }) {
 
     const [catModalOpen, setCatModalOpen] = useState(false);
     const [subModalOpen, setSubModalOpen] = useState(false);
+    const [confirmDelete, setConfirmDelete] = useState<{ type: 'cat' | 'sub', id: number } | null>(null);
+
     const [editingCat, setEditingCat] = useState<Categoria | null>(null);
     const [editingSub, setEditingSub] = useState<Subcategoria | null>(null);
 
@@ -230,25 +248,24 @@ export function CategoriesView({ active }: { active: boolean }) {
         fetchSubcategorias(selectedCat);
     }, [selectedCat]);
 
-    const handleDeleteCat = async (id: number) => {
-        if (!confirm("¿Eliminar esta categoría? También eliminará sus subcategorías.")) return;
+    const executeDelete = async () => {
+        if (!confirmDelete) return;
         try {
-            await invoke("delete_categoria", { id });
-            if (selectedCat === id) setSelectedCat(null);
-            fetchCategorias();
-            fetchSubcategorias(null);
+            if (confirmDelete.type === 'cat') {
+                await invoke("delete_categoria", { id: confirmDelete.id });
+                if (selectedCat === confirmDelete.id) setSelectedCat(null);
+                toast.success("Categoría eliminada");
+                fetchCategorias();
+                fetchSubcategorias(null);
+            } else {
+                await invoke("delete_subcategoria", { id: confirmDelete.id });
+                toast.success("Subcategoría eliminada");
+                fetchSubcategorias(selectedCat);
+            }
         } catch (e) {
-            alert("Error: " + e);
-        }
-    };
-
-    const handleDeleteSub = async (id: number) => {
-        if (!confirm("¿Eliminar esta subcategoría?")) return;
-        try {
-            await invoke("delete_subcategoria", { id });
-            fetchSubcategorias(selectedCat);
-        } catch (e) {
-            alert("Error: " + e);
+            toast.error("Error: " + e);
+        } finally {
+            setConfirmDelete(null);
         }
     };
 
@@ -281,7 +298,7 @@ export function CategoriesView({ active }: { active: boolean }) {
                         </div>
                         <button
                             onClick={() => { setEditingCat(null); setCatModalOpen(true); }}
-                            className="flex items-center gap-1.5 text-sm bg-primary text-primary-foreground px-3 py-1.5 rounded-lg hover:opacity-90 transition-all"
+                            className="flex items-center gap-1.5 text-sm bg-primary text-primary-foreground px-3 py-1.5 rounded-lg hover:opacity-90 transition-all shadow-md active:scale-95"
                         >
                             <Plus size={15} />
                             Nueva
@@ -325,7 +342,7 @@ export function CategoriesView({ active }: { active: boolean }) {
                                         <Pencil size={14} />
                                     </button>
                                     <button
-                                        onClick={(e) => { e.stopPropagation(); handleDeleteCat(cat.id!); }}
+                                        onClick={(e) => { e.stopPropagation(); setConfirmDelete({ type: 'cat', id: cat.id! }); }}
                                         className="p-1.5 hover:bg-destructive/10 rounded-lg text-muted-foreground hover:text-destructive transition-colors"
                                     >
                                         <Trash2 size={14} />
@@ -350,7 +367,7 @@ export function CategoriesView({ active }: { active: boolean }) {
                         </div>
                         <button
                             onClick={() => { setEditingSub(null); setSubModalOpen(true); }}
-                            className="flex items-center gap-1.5 text-sm bg-primary text-primary-foreground px-3 py-1.5 rounded-lg hover:opacity-90 transition-all"
+                            className="flex items-center gap-1.5 text-sm bg-primary text-primary-foreground px-3 py-1.5 rounded-lg hover:opacity-90 transition-all shadow-md active:scale-95"
                         >
                             <Plus size={15} />
                             Nueva
@@ -386,7 +403,7 @@ export function CategoriesView({ active }: { active: boolean }) {
                                         <Pencil size={14} />
                                     </button>
                                     <button
-                                        onClick={() => handleDeleteSub(sub.id!)}
+                                        onClick={() => setConfirmDelete({ type: 'sub', id: sub.id! })}
                                         className="p-1.5 hover:bg-destructive/10 rounded-lg text-muted-foreground hover:text-destructive transition-colors"
                                     >
                                         <Trash2 size={14} />
@@ -411,6 +428,17 @@ export function CategoriesView({ active }: { active: boolean }) {
                 onSave={() => fetchSubcategorias(selectedCat)}
                 subcategoria={editingSub}
                 categorias={categorias}
+            />
+            <ConfirmModal 
+                isOpen={!!confirmDelete}
+                onClose={() => setConfirmDelete(null)}
+                onConfirm={executeDelete}
+                title={confirmDelete?.type === 'cat' ? "¿Eliminar categoría?" : "¿Eliminar subcategoría?"}
+                description={confirmDelete?.type === 'cat' 
+                    ? "Esta acción es irreversible y eliminará todas las subcategorías asociadas." 
+                    : "Esta acción es irreversible."}
+                variant="danger"
+                confirmText="Eliminar"
             />
         </div>
     );

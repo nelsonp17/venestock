@@ -3,6 +3,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { X, Save } from "lucide-react";
 import { Producto } from "../types";
 import { SearchableSelect, SelectOption } from "../components/SearchableSelect";
+import { generateBarcode } from "../lib/utils";
+import toast from "react-hot-toast";
 
 interface ProductModalProps {
     isOpen: boolean;
@@ -118,7 +120,7 @@ export function ProductModal({ isOpen, onClose, onSave, product }: ProductModalP
 
             // Autogenerate barcode if missing
             if (!finalData.barras) {
-                finalData.barras = finalData.codigo;
+                finalData.barras = generateBarcode("750", "001");
             }
 
             // Ensure price in Bs is calculated with latest tasa before saving
@@ -129,7 +131,7 @@ export function ProductModal({ isOpen, onClose, onSave, product }: ProductModalP
             onSave();
             onClose();
         } catch (error) {
-            alert("Error al guardar producto: " + error);
+            toast.error("Error al guardar producto: " + error);
         }
     };
 

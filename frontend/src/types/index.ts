@@ -29,4 +29,14 @@ export interface Movimiento {
     total_bs: number;
     price_per_dolar: number;
     fecha: string | null;
+    factura_id: number | null;
+}
+
+export interface Factura {
+    id: number | null;
+    numero: string;
+    fecha: string;
+    proveedor: string | null;
+    observaciones: string | null;
+    created_at: string | null;
 }

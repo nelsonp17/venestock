@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Toaster } from "react-hot-toast";
 import { Sidebar } from "./components/Sidebar";
 import { TasaWidget } from "./components/TasaWidget";
 import { cn } from "./lib/utils";
@@ -36,6 +37,7 @@ function App() {
       </main>
 
       <TasaWidget />
+      <Toaster position="top-center" />
     </div>
   );
 }

@@ -86,7 +86,7 @@ export function AboutView({ active }: { active: boolean }) {
                         ¿Tienes dudas, sugerencias o necesitas reportar un problema? Ponte en contacto con el equipo de desarrollo.
                     </p>
                     <a
-                        href="mailto:soporte@venestock.local"
+                        href="mailto:nelsonportillo982@gmail.com"
                         className="inline-flex items-center justify-center space-x-2 w-full py-3 bg-white hover:bg-secondary/50 border border-primary/20 text-primary font-bold rounded-xl transition-colors"
                     >
                         <span>Contactar Desarrollador</span>

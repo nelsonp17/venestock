@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { toast } from "react-hot-toast";
 import {
     Package, AlertTriangle, TrendingUp, TrendingDown, DollarSign,
     ArrowDownLeft, ArrowUpRight, BarChart2, RefreshCw
@@ -105,8 +106,10 @@ export function DashboardView({ active }: { active: boolean }) {
         try {
             const s = await invoke<DashboardStats>("get_dashboard_stats");
             setStats(s);
+            toast.success("Datos actualizados");
         } catch (e) {
             console.error("Dashboard stats error:", e);
+            toast.error("Error al actualizar datos");
         } finally {
             setLoading(false);
         }
@@ -147,7 +150,7 @@ export function DashboardView({ active }: { active: boolean }) {
                 <button
                     onClick={fetchStats}
                     disabled={loading}
-                    className="flex items-center gap-2 px-4 py-2 bg-white border border-border rounded-xl text-sm font-medium hover:bg-secondary/50 transition-all disabled:opacity-50"
+                    className="flex items-center gap-2 px-4 py-2 bg-white border border-border rounded-xl text-sm font-medium hover:bg-secondary/50 active:scale-95 transition-all disabled:opacity-50 disabled:active:scale-100"
                 >
                     <RefreshCw size={15} className={cn(loading && "animate-spin")} />
                     Actualizar

@@ -17,7 +17,7 @@ export function LabelModal({ isOpen, onClose, product }: LabelModalProps) {
         if (isOpen && product && product.barras && canvasRef.current) {
             try {
                 bwipjs.toCanvas(canvasRef.current, {
-                    bcid: "code128",       // Barcode type
+                    bcid: product.barras,  // Barcode type
                     text: product.barras,  // Text to encode
                     scale: 3,              // 3x scaling factor
                     height: 10,            // Bar height, in millimeters
@@ -56,9 +56,9 @@ export function LabelModal({ isOpen, onClose, product }: LabelModalProps) {
 
                         <div className="flex justify-between w-full font-bold text-xl px-4">
                             <span className="text-primary">{formatCurrency(product.precio_ref_usd, "USD")}</span>
-                            <span className="text-foreground">{formatCurrency(product.precio_bs, "BS")}</span>
+                            {/* <span className="text-foreground">{formatCurrency(product.precio_bs, "BS")}</span> */}
                         </div>
-                        <p className="text-[10px] text-muted-foreground">SGM Venestock - {new Date().toLocaleDateString()}</p>
+                        {/* <p className="text-[10px] text-muted-foreground">SGM Venestock - {new Date().toLocaleDateString()}</p> */}
                     </div>
                 </div>
 

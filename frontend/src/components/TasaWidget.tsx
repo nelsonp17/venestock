@@ -2,10 +2,14 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { DollarSign, RefreshCcw } from "lucide-react";
 import { formatCurrency } from "../lib/utils";
+import { TasaConfirmModal } from "./TasaConfirmModal";
+import { toast } from "react-hot-toast";
 
 export function TasaWidget() {
     const [tasa, setTasa] = useState<{ valor: number; fuente: string; fecha: string } | null>(null);
     const [loading, setLoading] = useState(false);
+    const [showConfirm, setShowConfirm] = useState(false);
+    const [tempTasa, setTempTasa] = useState<number>(0);
 
     const fetchTasa = async () => {
         try {
@@ -20,12 +24,24 @@ export function TasaWidget() {
         setLoading(true);
         try {
             const result: any = await invoke("fetch_bcv_tasa");
-            if (confirm(`Nueva tasa BCV encontrada: ${result.valor}. ¿Desea guardarla?`)) {
-                const saved: any = await invoke("save_tasa", { valor: result.valor, fuente: "BCV" });
-                setTasa(saved);
-            }
+            setTempTasa(result.valor);
+            setShowConfirm(true);
         } catch (error) {
-            alert("Error al obtener tasa BCV: " + error);
+            toast.error("Error al obtener tasa BCV: " + error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const confirmSaveTasa = async () => {
+        setLoading(true);
+        try {
+            const saved: any = await invoke("save_tasa", { valor: tempTasa, fuente: "BCV" });
+            setTasa(saved);
+            setShowConfirm(false);
+            toast.success("Tasa actualizada correctamente");
+        } catch (error) {
+            toast.error("Error al guardar la tasa: " + error);
         } finally {
             setLoading(false);
         }
@@ -36,8 +52,8 @@ export function TasaWidget() {
     }, []);
 
     return (
-        <div className="fixed bottom-6 right-6 flex flex-col items-end space-y-2">
-            <div className="bg-white border border-border rounded-2xl shadow-lg p-4 flex items-center space-x-4">
+        <div className="fixed bottom-6 right-6 flex flex-col items-end space-y-2 z-40">
+            <div className="bg-white/80 backdrop-blur-md border-border border rounded-2xl shadow-xl p-4 flex items-center space-x-4">
                 <div className="bg-primary/10 p-3 rounded-xl">
                     <DollarSign className="text-primary" size={24} />
                 </div>
@@ -47,18 +63,27 @@ export function TasaWidget() {
                         {tasa ? formatCurrency(tasa.valor, "BS") : "---"}
                     </p>
                     <p className="text-[10px] text-muted-foreground">
-                        {tasa ? `Fuente: ${tasa.fuente} (${tasa.fecha.split('T')[0]})` : "Cargando..."}
+                        {tasa ? `Fuente: ${tasa.fuente} (${tasa.fecha.split('T')[0].replace(/-/g, "/")})` : "Cargando..."}
                     </p>
                 </div>
                 <button
                     onClick={handleScrapeBCV}
                     disabled={loading}
-                    className="p-2 hover:bg-secondary rounded-lg transition-colors disabled:opacity-50"
+                    className="p-2 hover:bg-secondary rounded-lg transition-colors disabled:opacity-50 group"
                     title="Actualizar desde BCV"
                 >
-                    <RefreshCcw className={loading ? "animate-spin" : ""} size={20} />
+                    <RefreshCcw className={cn("text-muted-foreground group-hover:text-foreground", loading ? "animate-spin" : "")} size={20} />
                 </button>
             </div>
+
+            <TasaConfirmModal 
+                isOpen={showConfirm}
+                loading={loading}
+                valor={tempTasa}
+                onClose={() => setShowConfirm(false)}
+                onConfirm={confirmSaveTasa}
+            />
         </div>
     );
 }
+import { cn } from "../lib/utils";
