@@ -82,7 +82,7 @@ export function MovementsView({ active, onNavigateToFacturas }: { active?: boole
                 <div className="flex items-center space-x-3">
                     <button
                         onClick={onNavigateToFacturas}
-                        className="flex items-center space-x-2 px-4 py-3 bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-2xl transition-all font-semibold border border-border active:scale-95"
+                        className="flex items-center space-x-2 px-4 py-2 bg-white border border-primary text-primary hover:bg-gray-200 rounded-xl transition-colors font-medium active:scale-95"
                     >
                         <FileText size={20} />
                         <span>Facturas</span>
@@ -125,68 +125,68 @@ export function MovementsView({ active, onNavigateToFacturas }: { active?: boole
                             ) : paginatedMovements.map((m, idx) => {
                                 const factura = getFacturaInfo(m.factura_id);
                                 return (
-                                <tr key={m.id} className="hover:bg-secondary/5 transition-colors group">
-                                    <td className="px-6 py-4 text-xs text-muted-foreground font-mono text-center">
-                                        {(currentPage - 1) * itemsPerPage + idx + 1}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="flex flex-col text-xs">
-                                            <span className="font-bold text-foreground">
-                                                {m.fecha ? new Date(m.fecha).toLocaleDateString() : "---"}
-                                            </span>
-                                            <span className="text-muted-foreground opacity-70">
-                                                {m.fecha ? new Date(m.fecha).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ""}
-                                            </span>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <span className={cn(
-                                            "inline-flex items-center space-x-1 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-tight",
-                                            m.tipo === "ENTRADA"
-                                                ? "bg-green-100 text-green-700"
-                                                : "bg-orange-100 text-orange-700"
-                                        )}>
-                                            {m.tipo === "ENTRADA" ? <ArrowDownLeft size={10} /> : <ArrowUpRight size={10} />}
-                                            <span>{m.tipo}</span>
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="font-medium text-sm text-foreground truncate max-w-[180px]" title={getProductName(m.producto_id)}>
-                                            {getProductName(m.producto_id)}
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 text-center font-bold text-sm">{m.cantidad}</td>
-                                    <td className="px-6 py-4 text-right">
-                                        <span className="font-mono text-xs text-muted-foreground">{(m.price_per_dolar || m.tasa_momento).toFixed(2)}</span>
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                        <div className="flex flex-col items-end">
-                                            <span className="font-bold text-sm text-primary">{formatCurrency(m.total_usd, "USD")}</span>
-                                            <span className="text-[10px] text-muted-foreground">{formatCurrency(m.total_bs, "BS")}</span>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        {factura ? (
-                                            <div className="flex items-center space-x-1 text-[10px] bg-primary/5 text-primary px-2 py-1 rounded-lg border border-primary/10 w-fit">
-                                                <FileText size={10} />
-                                                <span className="font-mono font-bold">{factura.numero}</span>
+                                    <tr key={m.id} className="hover:bg-secondary/5 transition-colors group">
+                                        <td className="px-6 py-4 text-xs text-muted-foreground font-mono text-center">
+                                            {(currentPage - 1) * itemsPerPage + idx + 1}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="flex flex-col text-xs">
+                                                <span className="font-bold text-foreground">
+                                                    {m.fecha ? new Date(m.fecha).toLocaleDateString() : "---"}
+                                                </span>
+                                                <span className="text-muted-foreground opacity-70">
+                                                    {m.fecha ? new Date(m.fecha).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ""}
+                                                </span>
                                             </div>
-                                        ) : (
-                                            <span className="text-[10px] text-muted-foreground italic">-</span>
-                                        )}
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button
-                                                onClick={() => setMovementToDelete(m.id!)}
-                                                className="p-2 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
-                                                title="Eliminar movimiento"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span className={cn(
+                                                "inline-flex items-center space-x-1 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-tight",
+                                                m.tipo === "ENTRADA"
+                                                    ? "bg-green-100 text-green-700"
+                                                    : "bg-orange-100 text-orange-700"
+                                            )}>
+                                                {m.tipo === "ENTRADA" ? <ArrowDownLeft size={10} /> : <ArrowUpRight size={10} />}
+                                                <span>{m.tipo}</span>
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="font-medium text-sm text-foreground truncate max-w-[180px]" title={getProductName(m.producto_id)}>
+                                                {getProductName(m.producto_id)}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-center font-bold text-sm">{m.cantidad}</td>
+                                        <td className="px-6 py-4 text-right">
+                                            <span className="font-mono text-xs text-muted-foreground">{(m.price_per_dolar || m.tasa_momento).toFixed(2)}</span>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <div className="flex flex-col items-end">
+                                                <span className="font-bold text-sm text-primary">{formatCurrency(m.total_usd, "USD")}</span>
+                                                <span className="text-[10px] text-muted-foreground">{formatCurrency(m.total_bs, "BS")}</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            {factura ? (
+                                                <div className="flex items-center space-x-1 text-[10px] bg-primary/5 text-primary px-2 py-1 rounded-lg border border-primary/10 w-fit">
+                                                    <FileText size={10} />
+                                                    <span className="font-mono font-bold">{factura.numero}</span>
+                                                </div>
+                                            ) : (
+                                                <span className="text-[10px] text-muted-foreground italic">-</span>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button
+                                                    onClick={() => setMovementToDelete(m.id!)}
+                                                    className="p-2 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                                                    title="Eliminar movimiento"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
                                 );
                             })}
                         </tbody>
@@ -230,7 +230,7 @@ export function MovementsView({ active, onNavigateToFacturas }: { active?: boole
                 facturas={facturas}
             />
 
-            <ConfirmModal 
+            <ConfirmModal
                 isOpen={!!movementToDelete}
                 onClose={() => setMovementToDelete(null)}
                 onConfirm={handleDeleteMovement}

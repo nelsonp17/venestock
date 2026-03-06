@@ -18,7 +18,7 @@ function App() {
     <div className="flex h-screen bg-secondary/30 selection:bg-primary/20">
       <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
 
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto bg-gray-100">
         <DashboardView active={activeTab === "dashboard"} />
         <div className={cn("transition-all duration-300", activeTab === "inventory" ? "block" : "hidden")}>
           <InventoryView active={activeTab === "inventory"} />

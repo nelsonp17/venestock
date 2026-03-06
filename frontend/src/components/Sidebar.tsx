@@ -13,7 +13,7 @@ const menuItems = [
 
 export function Sidebar({ activeTab, onTabChange }: { activeTab: string, onTabChange: (id: string) => void }) {
     return (
-        <div className="w-64 h-screen bg-white border-r border-border flex flex-col">
+        <div className="w-64 h-screen bg-white border-r border-gray-300 flex flex-col">
             <div className="p-6">
                 <h1 className="text-2xl font-bold text-primary">SGM VeneStock</h1>
             </div>

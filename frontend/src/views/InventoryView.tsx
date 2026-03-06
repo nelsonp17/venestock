@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Plus, Search, Edit2, Trash2, Calculator, Barcode, FileText, FileSpreadsheet } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, Calculator, Barcode, FileText, FileSpreadsheet, ChevronLeft, ChevronRight } from "lucide-react";
 import { formatCurrency } from "../lib/utils";
 import { ProductModal } from "./ProductModal.tsx";
 import { LabelModal } from "./LabelModal.tsx";
@@ -22,6 +22,10 @@ export function InventoryView({ active }: { active?: boolean }) {
     const [editingProduct, setEditingProduct] = useState<Producto | null>(null);
     const [selectedProduct, setSelectedProduct] = useState<Producto | null>(null);
     const [productToDelete, setProductToDelete] = useState<Producto | null>(null);
+
+    // Paginación
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
 
     const fetchProductos = async () => {
         setLoading(true);
@@ -128,10 +132,21 @@ export function InventoryView({ active }: { active?: boolean }) {
         }
     }, [active]);
 
+    // Resetear a la primera página cuando se busca
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [search]);
+
     const filtered = productos.filter(p =>
         p.nombre.toLowerCase().includes(search.toLowerCase()) ||
         p.codigo.toLowerCase().includes(search.toLowerCase()) ||
         (p.barras && p.barras.includes(search))
+    );
+
+    const totalPages = Math.ceil(filtered.length / itemsPerPage);
+    const paginatedProducts = filtered.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
     );
 
     return (
@@ -144,7 +159,7 @@ export function InventoryView({ active }: { active?: boolean }) {
                 <div className="flex space-x-3">
                     <button
                         onClick={() => setRecalculateOpen(true)}
-                        className="flex items-center space-x-2 px-4 py-2 border border-primary text-primary hover:bg-primary/5 rounded-xl transition-colors font-medium active:scale-95"
+                        className="flex items-center space-x-2 px-4 py-2 bg-white border border-primary text-primary hover:bg-gray-200 rounded-xl transition-colors font-medium active:scale-95"
                     >
                         <Calculator size={18} />
                         <span>Recalcular Precios</span>
@@ -159,7 +174,7 @@ export function InventoryView({ active }: { active?: boolean }) {
                 </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
+            <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden flex flex-col">
                 <div className="p-4 border-b border-border bg-secondary/10 flex justify-between items-center">
                     <div className="relative w-96">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
@@ -188,7 +203,7 @@ export function InventoryView({ active }: { active?: boolean }) {
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
                         <thead>
-                            <tr className="bg-secondary/5 text-xs uppercase tracking-wider text-muted-foreground">
+                            <tr className="bg-secondary/5 text-xs uppercase tracking-wider text-muted-foreground border-b border-border">
                                 <th className="px-6 py-4 font-semibold">Código</th>
                                 <th className="px-6 py-4 font-semibold">Producto</th>
                                 <th className="px-6 py-4 font-semibold text-right">Ref ($)</th>
@@ -203,11 +218,11 @@ export function InventoryView({ active }: { active?: boolean }) {
                                 <tr>
                                     <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">Cargando productos...</td>
                                 </tr>
-                            ) : filtered.length === 0 ? (
+                            ) : paginatedProducts.length === 0 ? (
                                 <tr>
                                     <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">No se encontraron productos.</td>
                                 </tr>
-                            ) : filtered.map((p) => (
+                            ) : paginatedProducts.map((p) => (
                                 <tr key={p.id} className="hover:bg-secondary/5 transition-colors group">
                                     <td className="px-6 py-4 font-mono text-xs">{p.codigo}</td>
                                     <td className="px-6 py-4">
@@ -254,6 +269,34 @@ export function InventoryView({ active }: { active?: boolean }) {
                         </tbody>
                     </table>
                 </div>
+
+                {/* Footer con Paginación */}
+                {totalPages > 1 && (
+                    <div className="p-4 border-t border-border bg-secondary/5 flex items-center justify-between">
+                        <p className="text-xs text-muted-foreground">
+                            Mostrando <span className="font-bold text-foreground">{paginatedProducts.length}</span> de <span className="font-bold text-foreground">{filtered.length}</span> productos
+                        </p>
+                        <div className="flex items-center space-x-2">
+                            <button
+                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                disabled={currentPage === 1}
+                                className="p-2 hover:bg-white border border-border rounded-xl disabled:opacity-30 transition-all active:scale-90"
+                            >
+                                <ChevronLeft size={18} />
+                            </button>
+                            <div className="flex items-center px-4 h-9 bg-white border border-border rounded-xl text-xs font-bold">
+                                Página {currentPage} de {totalPages}
+                            </div>
+                            <button
+                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                disabled={currentPage === totalPages}
+                                className="p-2 hover:bg-white border border-border rounded-xl disabled:opacity-30 transition-all active:scale-90"
+                            >
+                                <ChevronRight size={18} />
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
 
             <ProductModal
