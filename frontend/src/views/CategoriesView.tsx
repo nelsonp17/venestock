@@ -229,7 +229,7 @@ export function CategoriesView({ active }: { active: boolean }) {
     const fetchSubcategorias = async (catId: number | null) => {
         try {
             const subs: Subcategoria[] = await invoke("get_subcategorias", {
-                categoria_id: catId,
+                categoriaId: catId,
             });
             setSubcategorias(subs);
         } catch (e) {

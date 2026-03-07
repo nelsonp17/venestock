@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Plus, ArrowUpRight, ArrowDownLeft, Search, FileText, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, ArrowUpRight, ArrowDownLeft, Search, FileText, Trash2, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { cn, formatCurrency } from "../lib/utils";
 import { Movimiento, Producto, Factura } from "../types";
 import { toast } from "react-hot-toast";
@@ -43,9 +43,15 @@ export function MovementsView({ active, onNavigateToFacturas }: { active?: boole
 
     const handleDeleteMovement = async () => {
         if (!movementToDelete) return;
+        const mov = movements.find(m => m.id === movementToDelete);
+        if (!mov) return;
         try {
-            await invoke("delete_movement", { id: movementToDelete });
-            toast.success("Movimiento eliminado");
+            await invoke("delete_movement", { 
+                id: movementToDelete,
+                productoId: mov.producto_id,
+                cantidad: mov.cantidad,
+                tipo: mov.tipo
+            });            toast.success("Movimiento eliminado");
             fetchData();
         } catch (error) {
             toast.error("Error al eliminar movimiento: " + error);
@@ -155,7 +161,9 @@ export function MovementsView({ active, onNavigateToFacturas }: { active?: boole
                                                 {getProductName(m.producto_id)}
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 text-center font-bold text-sm">{m.cantidad}</td>
+                                        <td className="px-6 py-4 text-center font-bold text-sm">
+                                            {m.cantidad} <span className="text-[10px] text-muted-foreground ml-1">{(productos.find(p => p.id === m.producto_id))?.unidad}</span>
+                                        </td>
                                         <td className="px-6 py-4 text-right">
                                             <span className="font-mono text-xs text-muted-foreground">{(m.price_per_dolar || m.tasa_momento).toFixed(2)}</span>
                                         </td>
@@ -261,6 +269,7 @@ function MovementModal({ isOpen, onClose, onSave, productos, facturas }: {
         fecha: new Date().toISOString().slice(0, 16),
         factura_id: null
     });
+    const [isManualTotal, setIsManualTotal] = useState(false);
     const [loading, setLoading] = useState(false);
 
     const [searchQuery, setSearchQuery] = useState("");
@@ -272,6 +281,19 @@ function MovementModal({ isOpen, onClose, onSave, productos, facturas }: {
     );
 
     const selectedProduct = productos.find(p => p.id === formData.producto_id);
+
+    useEffect(() => {
+        if (selectedProduct && !isManualTotal) {
+            const qty = formData.cantidad || 0;
+            const total_usd = selectedProduct.precio_ref_usd * qty;
+            const rate = parseFloat(formData.price_per_dolar as any) || 0;
+            setFormData(prev => ({
+                ...prev,
+                total_usd: parseFloat(total_usd.toFixed(2)),
+                total_bs: parseFloat((total_usd * rate).toFixed(2))
+            }));
+        }
+    }, [formData.cantidad, formData.price_per_dolar, selectedProduct, isManualTotal]);
 
     useEffect(() => {
         const fetchTasa = async () => {
@@ -290,6 +312,7 @@ function MovementModal({ isOpen, onClose, onSave, productos, facturas }: {
                 });
                 setSearchQuery("");
                 setShowResults(false);
+                setIsManualTotal(false);
             } catch (e) {
                 console.error(e);
             }
@@ -305,12 +328,12 @@ function MovementModal({ isOpen, onClose, onSave, productos, facturas }: {
         if (!selectedProduct) return;
 
         const rate = parseFloat(formData.price_per_dolar as any) || 0;
-        const total_usd = (selectedProduct.precio_ref_usd * (formData.cantidad || 0));
-        const total_bs = total_usd * rate;
+        const total_usd = formData.total_usd || 0;
+        const total_bs = formData.total_bs || 0;
 
         // Stock validation
         if (formData.tipo === "SALIDA" && (formData.cantidad || 0) > selectedProduct.stock) {
-            return toast.error(`Error: No hay suficiente stock. Disponible: ${selectedProduct.stock}`);
+            return toast.error(`Error: No hay suficiente stock. Disponible: ${selectedProduct.stock} ${selectedProduct.unidad}`);
         }
 
         setLoading(true);
@@ -401,7 +424,7 @@ function MovementModal({ isOpen, onClose, onSave, productos, facturas }: {
                                             "text-[10px] font-bold px-1.5 rounded",
                                             selectedProduct.stock > 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
                                         )}>
-                                            {selectedProduct.stock} unidades
+                                            {selectedProduct.stock} {selectedProduct.unidad}
                                         </span>
                                     </div>
                                 </div>
@@ -426,36 +449,82 @@ function MovementModal({ isOpen, onClose, onSave, productos, facturas }: {
                         </div>
                         <div className="space-y-1">
                             <label className="text-sm font-semibold">Cantidad</label>
-                            <input
-                                type="number" min="1" required
-                                className="w-full px-4 py-2 border border-border rounded-xl outline-none focus:ring-2 focus:ring-primary/20"
-                                value={formData.cantidad}
-                                onChange={e => setFormData({ ...formData, cantidad: parseInt(e.target.value) })}
-                            />
+                            <div className="flex space-x-2">
+                                <input
+                                    type="number" step="any" min="0.001" required
+                                    className="w-full px-4 py-2 border border-border rounded-xl outline-none focus:ring-2 focus:ring-primary/20"
+                                    value={formData.cantidad}
+                                    onChange={e => setFormData({ ...formData, cantidad: parseFloat(e.target.value) || 0 })}
+                                />
+                                {selectedProduct && (
+                                    <span className="flex items-center px-3 py-2 bg-secondary/50 rounded-xl text-sm font-bold text-muted-foreground">
+                                        {selectedProduct.unidad}
+                                    </span>
+                                )}
+                            </div>
                         </div>
                     </div>
 
-                    <div className="p-4 bg-secondary/10 rounded-xl grid grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-bold uppercase text-muted-foreground">Tasa de Cambio</label>
-                            <div className="relative">
-                                <input
-                                    type="number" step="any" required
-                                    className="w-full px-3 py-1.5 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 font-bold outline-none"
-                                    value={formData.price_per_dolar}
-                                    onChange={e => setFormData({ ...formData, price_per_dolar: e.target.value as any })}
-                                />
-                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">Bs/$</span>
+                    <div className="p-4 bg-secondary/10 rounded-xl space-y-3">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold uppercase text-muted-foreground">Tasa de Cambio</label>
+                                <div className="relative">
+                                    <input
+                                        type="number" step="any" required
+                                        className="w-full px-3 py-1.5 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 font-bold outline-none"
+                                        value={formData.price_per_dolar}
+                                        onChange={e => setFormData({ ...formData, price_per_dolar: e.target.value as any })}
+                                    />
+                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">Bs/$</span>
+                                </div>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold uppercase text-muted-foreground">Total USD</label>
+                                <div className="relative">
+                                    <input
+                                        type="number" step="any" required
+                                        className={cn(
+                                            "w-full px-3 py-1.5 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 font-bold outline-none",
+                                            isManualTotal ? "bg-amber-50 border-amber-200" : "bg-white"
+                                        )}
+                                        value={formData.total_usd}
+                                        onChange={e => {
+                                            const val = parseFloat(e.target.value) || 0;
+                                            setFormData({ ...formData, total_usd: val });
+                                            setIsManualTotal(true);
+                                        }}
+                                    />
+                                    {isManualTotal && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsManualTotal(false)}
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-amber-600 hover:bg-amber-100 rounded-md transition-colors"
+                                            title="Restablecer cálculo automático"
+                                        >
+                                            <X size={12} />
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         </div>
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-bold uppercase text-muted-foreground">Fecha y Hora</label>
-                            <input
-                                type="datetime-local" required
-                                className="w-full px-3 py-1.5 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 text-xs outline-none"
-                                value={formData.fecha || ""}
-                                onChange={e => setFormData({ ...formData, fecha: e.target.value })}
-                            />
+
+                        <div className="flex justify-between items-center pt-2 border-t border-border/50">
+                            <div className="flex flex-col">
+                                <span className="text-[10px] font-bold uppercase text-muted-foreground">Total en Bolívares</span>
+                                <span className="font-black text-foreground">
+                                    {formatCurrency(formData.total_bs || 0, "BS")}
+                                </span>
+                            </div>
+                            <div className="text-right">
+                                <span className="text-[10px] font-bold uppercase text-muted-foreground">Fecha y Hora</span>
+                                <input
+                                    type="datetime-local" required
+                                    className="block w-full bg-transparent text-right text-xs outline-none font-medium"
+                                    value={formData.fecha || ""}
+                                    onChange={e => setFormData({ ...formData, fecha: e.target.value })}
+                                />
+                            </div>
                         </div>
                     </div>
 

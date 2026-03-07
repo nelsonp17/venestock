@@ -12,7 +12,8 @@ use tauri::path::BaseDirectory;
 #[derive(serde::Serialize)]
 struct ProductoChartItem {
     nombre: String,
-    cantidad: i64,
+    unidad: String,
+    cantidad: f64,
     total_usd: f64,
     total_bs: f64,
 }
@@ -67,7 +68,7 @@ async fn get_dashboard_stats(state: State<'_, AppState>) -> Result<DashboardStat
 
     // Top 8 productos por cantidad en entradas
     let rows_entradas = sqlx::query(
-        "SELECT p.nombre, SUM(m.cantidad) as cantidad, SUM(CAST(m.total_usd AS REAL)) as total_usd, SUM(CAST(m.total_bs AS REAL)) as total_bs
+        "SELECT p.nombre, p.unidad, SUM(m.cantidad) as cantidad, SUM(CAST(m.total_usd AS REAL)) as total_usd, SUM(CAST(m.total_bs AS REAL)) as total_bs
          FROM movimientos m
          JOIN productos p ON p.id = m.producto_id
          WHERE m.tipo = 'ENTRADA'
@@ -80,6 +81,7 @@ async fn get_dashboard_stats(state: State<'_, AppState>) -> Result<DashboardStat
         use sqlx::Row;
         ProductoChartItem {
             nombre: r.get("nombre"),
+            unidad: r.get("unidad"),
             cantidad: r.get("cantidad"),
             total_usd: r.get("total_usd"),
             total_bs: r.get("total_bs"),
@@ -88,7 +90,7 @@ async fn get_dashboard_stats(state: State<'_, AppState>) -> Result<DashboardStat
 
     // Top 8 productos por cantidad en salidas
     let rows_salidas = sqlx::query(
-        "SELECT p.nombre, SUM(m.cantidad) as cantidad, SUM(CAST(m.total_usd AS REAL)) as total_usd, SUM(CAST(m.total_bs AS REAL)) as total_bs
+        "SELECT p.nombre, p.unidad, SUM(m.cantidad) as cantidad, SUM(CAST(m.total_usd AS REAL)) as total_usd, SUM(CAST(m.total_bs AS REAL)) as total_bs
          FROM movimientos m
          JOIN productos p ON p.id = m.producto_id
          WHERE m.tipo = 'SALIDA'
@@ -101,6 +103,7 @@ async fn get_dashboard_stats(state: State<'_, AppState>) -> Result<DashboardStat
         use sqlx::Row;
         ProductoChartItem {
             nombre: r.get("nombre"),
+            unidad: r.get("unidad"),
             cantidad: r.get("cantidad"),
             total_usd: r.get("total_usd"),
             total_bs: r.get("total_bs"),
@@ -169,7 +172,7 @@ async fn get_productos(state: State<'_, AppState>) -> Result<Vec<Producto>, Stri
 #[tauri::command]
 async fn upsert_producto(state: State<'_, AppState>, mut producto: Producto) -> Result<Producto, String> {
     if let Some(id) = producto.id {
-        sqlx::query("UPDATE productos SET codigo=?, barras=?, nombre=?, descripcion=?, precio_ref_usd=?, precio_bs=?, categoria=?, subcategoria=?, stock=?, price_per_dolar=? WHERE id=?")
+        sqlx::query("UPDATE productos SET codigo=?, barras=?, nombre=?, descripcion=?, precio_ref_usd=?, precio_bs=?, categoria=?, subcategoria=?, stock=?, unidad=?, price_per_dolar=? WHERE id=?")
             .bind(&producto.codigo)
             .bind(&producto.barras)
             .bind(&producto.nombre)
@@ -179,13 +182,14 @@ async fn upsert_producto(state: State<'_, AppState>, mut producto: Producto) -> 
             .bind(&producto.categoria)
             .bind(&producto.subcategoria)
             .bind(producto.stock)
+            .bind(&producto.unidad)
             .bind(producto.price_per_dolar)
             .bind(id)
             .execute(&state.db)
             .await
             .map_err(|e| e.to_string())?;
     } else {
-        let result = sqlx::query("INSERT INTO productos (codigo, barras, nombre, descripcion, precio_ref_usd, precio_bs, categoria, subcategoria, stock, price_per_dolar) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        let result = sqlx::query("INSERT INTO productos (codigo, barras, nombre, descripcion, precio_ref_usd, precio_bs, categoria, subcategoria, stock, unidad, price_per_dolar) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
             .bind(&producto.codigo)
             .bind(&producto.barras)
             .bind(&producto.nombre)
@@ -195,6 +199,7 @@ async fn upsert_producto(state: State<'_, AppState>, mut producto: Producto) -> 
             .bind(&producto.categoria)
             .bind(&producto.subcategoria)
             .bind(producto.stock)
+            .bind(&producto.unidad)
             .bind(producto.price_per_dolar)
             .execute(&state.db)
             .await
@@ -207,11 +212,23 @@ async fn upsert_producto(state: State<'_, AppState>, mut producto: Producto) -> 
 
 #[tauri::command]
 async fn delete_producto(state: State<'_, AppState>, id: i64) -> Result<(), String> {
-    sqlx::query("DELETE FROM productos WHERE id = ?")
+    let mut tx = state.db.begin().await.map_err(|e| e.to_string())?;
+
+    // Delete associated movements first to avoid foreign key constraints
+    sqlx::query("DELETE FROM movimientos WHERE producto_id = ?")
         .bind(id)
-        .execute(&state.db)
+        .execute(&mut *tx)
         .await
         .map_err(|e| e.to_string())?;
+
+    // Delete the product
+    sqlx::query("DELETE FROM productos WHERE id = ?")
+        .bind(id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    tx.commit().await.map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -271,10 +288,32 @@ async fn record_movement(state: State<'_, AppState>, mut mov: Movimiento) -> Res
         .await
         .map_err(|e| e.to_string())?;
 
-    let modifier = if mov.tipo == "ENTRADA" { 1 } else { -1 };
+    let modifier = if mov.tipo == "ENTRADA" { 1.0 } else { -1.0 };
     sqlx::query("UPDATE productos SET stock = stock + ? WHERE id = ?")
         .bind(mov.cantidad * modifier)
         .bind(mov.producto_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    tx.commit().await.map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn delete_movement(state: State<'_, AppState>, id: i32, producto_id: i32, cantidad: f64, tipo: String) -> Result<(), String> {
+    let mut tx = state.db.begin().await.map_err(|e| e.to_string())?;
+
+    let modifier = if tipo == "ENTRADA" { -1.0 } else { 1.0 };
+    sqlx::query("UPDATE productos SET stock = stock + ? WHERE id = ?")
+        .bind(cantidad * modifier)
+        .bind(producto_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    sqlx::query("DELETE FROM movimientos WHERE id = ?")
+        .bind(id)
         .execute(&mut *tx)
         .await
         .map_err(|e| e.to_string())?;
@@ -395,7 +434,7 @@ async fn import_data(
     }
 
     for prod in productos {
-        sqlx::query("INSERT OR REPLACE INTO productos (id, codigo, barras, nombre, descripcion, precio_ref_usd, precio_bs, categoria, subcategoria, stock, price_per_dolar) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        sqlx::query("INSERT OR REPLACE INTO productos (id, codigo, barras, nombre, descripcion, precio_ref_usd, precio_bs, categoria, subcategoria, stock, unidad, price_per_dolar) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
             .bind(prod.id)
             .bind(prod.codigo)
             .bind(prod.barras)
@@ -406,6 +445,7 @@ async fn import_data(
             .bind(prod.categoria)
             .bind(prod.subcategoria)
             .bind(prod.stock)
+            .bind(prod.unidad)
             .bind(prod.price_per_dolar)
             .execute(&mut *tx)
             .await
@@ -479,11 +519,23 @@ async fn upsert_categoria(state: State<'_, AppState>, mut categoria: models::Cat
 
 #[tauri::command]
 async fn delete_categoria(state: State<'_, AppState>, id: i32) -> Result<(), String> {
-    sqlx::query("DELETE FROM categorias WHERE id = ?")
+    let mut tx = state.db.begin().await.map_err(|e| e.to_string())?;
+
+    // Cascade: delete subcategories first
+    sqlx::query("DELETE FROM subcategorias WHERE categoria_id = ?")
         .bind(id)
-        .execute(&state.db)
+        .execute(&mut *tx)
         .await
         .map_err(|e| e.to_string())?;
+
+    // Delete the category
+    sqlx::query("DELETE FROM categorias WHERE id = ?")
+        .bind(id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    tx.commit().await.map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -574,11 +626,23 @@ async fn upsert_factura(state: State<'_, AppState>, mut factura: Factura) -> Res
 
 #[tauri::command]
 async fn delete_factura(state: State<'_, AppState>, id: i32) -> Result<(), String> {
-    sqlx::query("DELETE FROM facturas WHERE id = ?")
+    let mut tx = state.db.begin().await.map_err(|e| e.to_string())?;
+
+    // Cascade: delete associated movements first
+    sqlx::query("DELETE FROM movimientos WHERE factura_id = ?")
         .bind(id)
-        .execute(&state.db)
+        .execute(&mut *tx)
         .await
         .map_err(|e| e.to_string())?;
+
+    // Delete the factura
+    sqlx::query("DELETE FROM facturas WHERE id = ?")
+        .bind(id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    tx.commit().await.map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -588,7 +652,8 @@ struct FacturaItem {
     producto_id: i32,
     producto_nombre: String,
     producto_codigo: String,
-    cantidad: i32,
+    unidad: String,
+    cantidad: f64,
     total_usd: f64,
     total_bs: f64,
     tipo: String,
@@ -598,7 +663,7 @@ struct FacturaItem {
 #[tauri::command]
 async fn get_factura_items(state: State<'_, AppState>, factura_id: i32) -> Result<Vec<FacturaItem>, String> {
     let rows = sqlx::query(
-        "SELECT m.id, m.producto_id, p.nombre as producto_nombre, p.codigo as producto_codigo, 
+        "SELECT m.id, m.producto_id, p.nombre as producto_nombre, p.codigo as producto_codigo, p.unidad,
                 m.cantidad, m.total_usd, m.total_bs, m.tipo
          FROM movimientos m
          JOIN productos p ON p.id = m.producto_id
@@ -613,17 +678,18 @@ async fn get_factura_items(state: State<'_, AppState>, factura_id: i32) -> Resul
     let items = rows.iter().map(|r| {
         use sqlx::Row;
         let total_usd: f64 = r.get("total_usd");
-        let cantidad: i32 = r.get("cantidad");
+        let cantidad: f64 = r.get("cantidad");
         FacturaItem {
             id: r.get("id"),
             producto_id: r.get("producto_id"),
             producto_nombre: r.get("producto_nombre"),
             producto_codigo: r.get("producto_codigo"),
+            unidad: r.get("unidad"),
             cantidad,
             total_usd,
             total_bs: r.get("total_bs"),
             tipo: r.get("tipo"),
-            precio_unitario_usd: if cantidad > 0 { total_usd / cantidad as f64 } else { 0.0 },
+            precio_unitario_usd: if cantidad > 0.0 { total_usd / cantidad } else { 0.0 },
         }
     }).collect();
 
@@ -677,6 +743,7 @@ pub fn run() {
             get_stats,
             get_movements,
             record_movement,
+            delete_movement,
             save_export_file,
             export_data,
             import_data,

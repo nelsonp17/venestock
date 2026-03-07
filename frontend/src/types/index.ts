@@ -9,6 +9,7 @@ export interface Producto {
     categoria: string | null;
     subcategoria: string | null;
     stock: number;
+    unidad: string;
     price_per_dolar: number;
 }
 

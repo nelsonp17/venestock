@@ -35,11 +35,11 @@ interface ChartItem {
 // ── Tooltip personalizado para recharts ────────────────────────────────────────
 function CustomTooltip({ active, payload }: any) {
     if (active && payload && payload.length) {
-        const d: ChartItem = payload[0].payload;
+        const d: any = payload[0].payload;
         return (
             <div className="bg-white border border-border rounded-xl shadow-lg p-3 text-xs min-w-[160px]">
                 <p className="font-bold text-foreground mb-1 leading-tight">{d.nombre}</p>
-                <p className="text-muted-foreground">Cantidad: <span className="font-semibold text-foreground">{d.cantidad}</span></p>
+                <p className="text-muted-foreground">Cantidad: <span className="font-semibold text-foreground">{d.cantidad} <span className="text-[10px]">{d.unidad}</span></span></p>
                 <p className="text-muted-foreground">USD: <span className="font-semibold text-primary">{formatCurrency(d.total_usd, "USD")}</span></p>
                 <p className="text-muted-foreground">Bs: <span className="font-semibold text-foreground">{formatCurrency(d.total_bs, "BS")}</span></p>
             </div>

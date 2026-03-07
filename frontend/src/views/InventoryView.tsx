@@ -109,7 +109,7 @@ export function InventoryView({ active }: { active?: boolean }) {
                 formatCurrency(p.precio_ref_usd, "USD"),
                 p.price_per_dolar,
                 formatCurrency(p.precio_bs, "BS"),
-                p.stock.toString()
+                `${p.stock} ${p.unidad}`
             ]);
 
             autoTable(doc, {
@@ -143,7 +143,8 @@ export function InventoryView({ active }: { active?: boolean }) {
                 Referencia_USD: p.precio_ref_usd,
                 Precio_BS: p.precio_bs,
                 Categoría: p.categoria,
-                Stock: p.stock
+                Stock: p.stock,
+                Unidad: p.unidad
             })));
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "Inventario");
@@ -311,7 +312,7 @@ export function InventoryView({ active }: { active?: boolean }) {
                                         {formatCurrency(p.precio_bs, "BS")}
                                     </td>
                                     <td className="px-6 py-4 text-center font-bold">
-                                        {p.stock}
+                                        {p.stock} <span className="text-[10px] text-muted-foreground ml-1">{p.unidad}</span>
                                     </td>
                                     <td className="px-6 py-4">
                                         <div className="flex justify-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">

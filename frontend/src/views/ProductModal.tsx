@@ -28,6 +28,7 @@ export function ProductModal({ isOpen, onClose, onSave, product }: ProductModalP
         categoria: "",
         subcategoria: "",
         stock: 0,
+        unidad: "UNID",
         price_per_dolar: 1.0
     });
 
@@ -55,7 +56,7 @@ export function ProductModal({ isOpen, onClose, onSave, product }: ProductModalP
         const fetchAll = async () => {
             try {
                 const cats = await invoke<Categoria[]>("get_categorias");
-                const subs = await invoke<Subcategoria[]>("get_subcategorias", { categoria_id: null });
+                const subs = await invoke<Subcategoria[]>("get_subcategorias", { categoriaId: null });
                 setCategorias(cats);
                 setSubcategorias(subs);
             } catch (e) {
@@ -81,6 +82,7 @@ export function ProductModal({ isOpen, onClose, onSave, product }: ProductModalP
                 categoria: "",
                 subcategoria: "",
                 stock: 0,
+                unidad: "UNID",
                 price_per_dolar: tasa
             });
         }
@@ -186,12 +188,26 @@ export function ProductModal({ isOpen, onClose, onSave, product }: ProductModalP
                         </div>
                         <div className="space-y-2">
                             <label className="text-sm font-semibold">Stock Inicial</label>
-                            <input
-                                type="number" required
-                                value={formData.stock}
-                                onChange={e => setFormData({ ...formData, stock: parseInt(e.target.value) })}
-                                className="w-full px-4 py-2 border border-border rounded-xl focus:ring-2 focus:ring-primary/20 outline-none"
-                            />
+                            <div className="flex space-x-2">
+                                <input
+                                    type="number" step="any" required
+                                    value={formData.stock}
+                                    onChange={e => setFormData({ ...formData, stock: parseFloat(e.target.value) || 0 })}
+                                    className="w-full px-4 py-2 border border-border rounded-xl focus:ring-2 focus:ring-primary/20 outline-none"
+                                />
+                                <select
+                                    value={formData.unidad}
+                                    onChange={e => setFormData({ ...formData, unidad: e.target.value })}
+                                    className="px-2 py-2 border border-border rounded-xl focus:ring-2 focus:ring-primary/20 outline-none bg-white text-sm font-semibold"
+                                >
+                                    <option value="UNID">UNID</option>
+                                    <option value="KG">KG</option>
+                                    <option value="G">G</option>
+                                    <option value="L">L</option>
+                                    <option value="ML">ML</option>
+                                    <option value="PAQ">PAQ</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
 

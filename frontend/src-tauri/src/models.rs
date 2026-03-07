@@ -13,7 +13,8 @@ pub struct Producto {
     pub precio_bs: f64,
     pub categoria: Option<String>,
     pub subcategoria: Option<String>,
-    pub stock: i32,
+    pub stock: f64,
+    pub unidad: String,
     pub price_per_dolar: f64,
 }
 
@@ -30,7 +31,7 @@ pub struct Movimiento {
     pub id: Option<i32>,
     pub producto_id: i32,
     pub tipo: String,
-    pub cantidad: i32,
+    pub cantidad: f64,
     pub tasa_momento: f64,
     pub total_usd: f64,
     pub total_bs: f64,

@@ -15,6 +15,9 @@ pub async fn init_db(app_handle: &AppHandle) -> Result<SqlitePool, Box<dyn std::
 
     let pool = SqlitePool::connect_with(options).await?;
 
+    // Enable foreign keys
+    sqlx::query("PRAGMA foreign_keys = ON").execute(&pool).await?;
+
     // Run migrations (schema)
     let schema = include_str!("../schema.sql");
     sqlx::query(schema).execute(&pool).await?;
@@ -25,6 +28,10 @@ pub async fn init_db(app_handle: &AppHandle) -> Result<SqlitePool, Box<dyn std::
         .await;
 
     let _ = sqlx::query("ALTER TABLE movimientos ADD COLUMN price_per_dolar REAL NOT NULL DEFAULT 1.0")
+        .execute(&pool)
+        .await;
+
+    let _ = sqlx::query("ALTER TABLE productos ADD COLUMN unidad TEXT NOT NULL DEFAULT 'UNID'")
         .execute(&pool)
         .await;
 

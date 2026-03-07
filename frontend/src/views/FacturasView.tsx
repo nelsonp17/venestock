@@ -235,7 +235,7 @@ export function FacturasView({ active }: { active: boolean }) {
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 text-center font-mono font-bold">
-                                            {item.cantidad}
+                                            {item.cantidad} <span className="text-[10px] text-muted-foreground ml-1">{(item as any).unidad}</span>
                                         </td>
                                         <td className="px-6 py-4 text-right font-mono text-sm">
                                             {formatCurrency(item.precio_unitario_usd, "USD")}
