@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Plus, ArrowUpRight, ArrowDownLeft, Search, FileText, Trash2, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { Plus, ArrowUpRight, ArrowDownLeft, Search, FileText, Trash2, ChevronLeft, ChevronRight, X, HelpCircle, Info } from "lucide-react";
 import { cn, formatCurrency } from "../lib/utils";
 import { Movimiento, Producto, Factura } from "../types";
 import { toast } from "react-hot-toast";
@@ -46,12 +46,12 @@ export function MovementsView({ active, onNavigateToFacturas }: { active?: boole
         const mov = movements.find(m => m.id === movementToDelete);
         if (!mov) return;
         try {
-            await invoke("delete_movement", { 
+            await invoke("delete_movement", {
                 id: movementToDelete,
                 productoId: mov.producto_id,
                 cantidad: mov.cantidad,
                 tipo: mov.tipo
-            });            toast.success("Movimiento eliminado");
+            }); toast.success("Movimiento eliminado");
             fetchData();
         } catch (error) {
             toast.error("Error al eliminar movimiento: " + error);
@@ -262,6 +262,7 @@ function MovementModal({ isOpen, onClose, onSave, productos, facturas }: {
         producto_id: undefined,
         tipo: "ENTRADA",
         cantidad: 1,
+        precio_unitario: 0,
         tasa_momento: 0,
         price_per_dolar: 0,
         total_usd: 0,
@@ -271,6 +272,7 @@ function MovementModal({ isOpen, onClose, onSave, productos, facturas }: {
     });
     const [isManualTotal, setIsManualTotal] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [showHelp, setShowHelp] = useState(false);
 
     const [searchQuery, setSearchQuery] = useState("");
     const [showResults, setShowResults] = useState(false);
@@ -285,7 +287,14 @@ function MovementModal({ isOpen, onClose, onSave, productos, facturas }: {
     useEffect(() => {
         if (selectedProduct && !isManualTotal) {
             const qty = formData.cantidad || 0;
-            const total_usd = selectedProduct.precio_ref_usd * qty;
+            const unitPrice = formData.precio_unitario || selectedProduct.precio_ref_usd;
+
+            // If we just selected the product, set its reference price
+            if (formData.precio_unitario === 0) {
+                setFormData(prev => ({ ...prev, precio_unitario: selectedProduct.precio_ref_usd }));
+            }
+
+            const total_usd = unitPrice * qty;
             const rate = parseFloat(formData.price_per_dolar as any) || 0;
             setFormData(prev => ({
                 ...prev,
@@ -293,7 +302,7 @@ function MovementModal({ isOpen, onClose, onSave, productos, facturas }: {
                 total_bs: parseFloat((total_usd * rate).toFixed(2))
             }));
         }
-    }, [formData.cantidad, formData.price_per_dolar, selectedProduct, isManualTotal]);
+    }, [formData.cantidad, formData.precio_unitario, formData.price_per_dolar, selectedProduct, isManualTotal]);
 
     useEffect(() => {
         const fetchTasa = async () => {
@@ -303,6 +312,7 @@ function MovementModal({ isOpen, onClose, onSave, productos, facturas }: {
                     producto_id: undefined,
                     tipo: "ENTRADA",
                     cantidad: 1,
+                    precio_unitario: 0,
                     tasa_momento: tasaObj.valor,
                     price_per_dolar: tasaObj.valor,
                     total_usd: 0,
@@ -330,6 +340,7 @@ function MovementModal({ isOpen, onClose, onSave, productos, facturas }: {
         const rate = parseFloat(formData.price_per_dolar as any) || 0;
         const total_usd = formData.total_usd || 0;
         const total_bs = formData.total_bs || 0;
+        const precio_unitario = formData.precio_unitario || 0;
 
         // Stock validation
         if (formData.tipo === "SALIDA" && (formData.cantidad || 0) > selectedProduct.stock) {
@@ -347,6 +358,7 @@ function MovementModal({ isOpen, onClose, onSave, productos, facturas }: {
             await invoke("record_movement", {
                 mov: {
                     ...formData,
+                    precio_unitario,
                     price_per_dolar: rate,
                     total_usd,
                     total_bs,
@@ -367,194 +379,258 @@ function MovementModal({ isOpen, onClose, onSave, productos, facturas }: {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
-                <div className="p-6 border-b border-border">
+            <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[95vh]">
+                <div className="p-6 border-b border-border flex justify-between items-center bg-white sticky top-0 z-10">
                     <h3 className="text-xl font-bold">Registrar Movimiento</h3>
-                </div>
-                <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                    <div className="space-y-1 relative">
-                        <label className="text-sm font-semibold">Buscar Producto</label>
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
-                            <input
-                                type="text"
-                                placeholder="Escribe el código o nombre..."
-                                className="w-full pl-10 pr-4 py-2 border border-border rounded-xl focus:ring-2 focus:ring-primary/20 outline-none"
-                                value={searchQuery}
-                                onChange={(e) => {
-                                    setSearchQuery(e.target.value);
-                                    setShowResults(true);
-                                }}
-                                onFocus={() => setShowResults(true)}
-                            />
-                        </div>
-
-                        {showResults && searchQuery && (
-                            <div className="absolute z-[70] left-0 right-0 top-full mt-1 bg-white border border-border rounded-xl shadow-xl max-h-60 overflow-y-auto">
-                                {filteredProducts.length === 0 ? (
-                                    <div className="p-4 text-center text-muted-foreground text-sm">No se encontraron productos</div>
-                                ) : (
-                                    filteredProducts.map(p => (
-                                        <button
-                                            key={p.id}
-                                            type="button"
-                                            className="w-full text-left px-4 py-2 hover:bg-secondary/10 flex flex-col border-b border-border last:border-none"
-                                            onClick={() => {
-                                                setFormData({ ...formData, producto_id: p.id! });
-                                                setSearchQuery(`${p.nombre} (${p.codigo})`);
-                                                setShowResults(false);
-                                            }}
-                                        >
-                                            <span className="font-bold text-sm text-foreground">{p.nombre}</span>
-                                            <span className="text-[10px] text-muted-foreground font-mono">{p.codigo}</span>
-                                        </button>
-                                    ))
-                                )}
-                            </div>
+                    <button
+                        type="button"
+                        onClick={() => setShowHelp(!showHelp)}
+                        className={cn(
+                            "p-2 rounded-xl transition-all flex items-center space-x-2 text-xs font-bold",
+                            showHelp ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:text-foreground"
                         )}
+                    >
+                        <HelpCircle size={18} />
+                        <span>{showHelp ? "Cerrar Ayuda" : "¿Ayuda?"}</span>
+                    </button>
+                </div>
 
-                        {selectedProduct && !showResults && (
-                            <div className="mt-2 p-3 bg-primary/5 border border-primary/20 rounded-xl flex justify-between items-center animate-in fade-in slide-in-from-top-1">
-                                <div className="flex flex-col">
-                                    <span className="text-xs font-bold text-primary uppercase">Seleccionado:</span>
-                                    <span className="text-sm font-medium">{selectedProduct.nombre}</span>
-                                    <div className="flex items-center space-x-2 mt-0.5">
-                                        <span className="text-[10px] text-muted-foreground uppercase font-bold">Stock actual:</span>
-                                        <span className={cn(
-                                            "text-[10px] font-bold px-1.5 rounded",
-                                            selectedProduct.stock > 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-                                        )}>
-                                            {selectedProduct.stock} {selectedProduct.unidad}
-                                        </span>
+                <div className="overflow-y-auto flex-1">
+                    {showHelp && (
+                        <div className="p-6 bg-primary/5 border-b border-primary/10 animate-in slide-in-from-top-4 duration-300">
+                            <div className="flex items-start space-x-3">
+                                <Info className="text-primary mt-1 shrink-0" size={20} />
+                                <div className="space-y-3 text-sm">
+                                    <p className="font-bold text-primary">Guía de Registro Contable:</p>
+                                    <ul className="space-y-2 text-muted-foreground leading-relaxed">
+                                        <li>• <span className="text-foreground font-semibold">Tipo:</span> Entrada (cuando compras/repones) o Salida (cuando vendes/sacas).</li>
+                                        <li>• <span className="text-foreground font-semibold">Cantidad:</span> Cantidad de unidades (kg, g, ml, etc.) que compraste o vendiste.</li>
+                                        <li>• <span className="text-foreground font-semibold">Precio Unitario ($):</span> Es lo que pagaste (Entrada) o cobraste (Salida) por cada unidad. Por defecto es el precio de referencia del inventario.</li>
+                                        <li>• <span className="text-foreground font-semibold">Total USD:</span> Se calcula como <code className="bg-white px-1 rounded border">Cant. × Precio</code>. Se mantiene <span className="italic">editable</span> para ajustes de redondeo o costos extra pactados.</li>
+                                        <li>• <span className="text-foreground font-semibold">Fecha y Hora:</span> Fecha y hora de la operación.</li>
+                                        <li>• <span className="text-foreground font-semibold">Factura:</span> Factura de la operación.</li>
+                                        <li>• <span className="text-foreground font-semibold">Tasa de Cambio:</span> Tasa de cambio aplicada en el momento de la operación, por defecto es la tasa actual pero puede ser editada.</li>
+                                        <li>• <span className="text-foreground font-semibold">Ref. Inventario:</span> Precio de referencia del inventario.</li>
+                                    </ul>
+                                    <div className="bg-white/50 p-3 rounded-xl border border-primary/10">
+                                        <p className="text-[10px] font-black uppercase text-primary mb-1">Ejemplo de uso:</p>
+                                        <p className="text-xs italic">
+                                            "Compro 10kg a $0.80 c/u. El sistema calcula $8.00, pero la factura dice $8.10 por un recargo de transporte. Edito el <b>Total USD</b> a $8.10 para que la contabilidad sea exacta."
+                                        </p>
                                     </div>
                                 </div>
-                                <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded font-mono font-bold">
-                                    {selectedProduct.codigo}
-                                </span>
                             </div>
-                        )}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                            <label className="text-sm font-semibold">Tipo</label>
-                            <select
-                                className="w-full px-4 py-2 border border-border rounded-xl outline-none focus:ring-2 focus:ring-primary/20"
-                                value={formData.tipo}
-                                onChange={e => setFormData({ ...formData, tipo: e.target.value as any })}
-                            >
-                                <option value="ENTRADA">Entrada / Compra</option>
-                                <option value="SALIDA">Salida / Venta</option>
-                            </select>
                         </div>
-                        <div className="space-y-1">
-                            <label className="text-sm font-semibold">Cantidad</label>
-                            <div className="flex space-x-2">
+                    )}
+
+                    <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                        <div className="space-y-1 relative">
+                            <label className="text-sm font-semibold">Buscar Producto</label>
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
                                 <input
-                                    type="number" step="any" min="0.001" required
-                                    className="w-full px-4 py-2 border border-border rounded-xl outline-none focus:ring-2 focus:ring-primary/20"
-                                    value={formData.cantidad}
-                                    onChange={e => setFormData({ ...formData, cantidad: parseFloat(e.target.value) || 0 })}
+                                    type="text"
+                                    placeholder="Escribe el código o nombre..."
+                                    className="w-full pl-10 pr-4 py-2 border border-border rounded-xl focus:ring-2 focus:ring-primary/20 outline-none"
+                                    value={searchQuery}
+                                    onChange={(e) => {
+                                        setSearchQuery(e.target.value);
+                                        setShowResults(true);
+                                    }}
+                                    onFocus={() => setShowResults(true)}
                                 />
-                                {selectedProduct && (
-                                    <span className="flex items-center px-3 py-2 bg-secondary/50 rounded-xl text-sm font-bold text-muted-foreground">
-                                        {selectedProduct.unidad}
-                                    </span>
-                                )}
                             </div>
-                        </div>
-                    </div>
 
-                    <div className="p-4 bg-secondary/10 rounded-xl space-y-3">
+                            {showResults && searchQuery && (
+                                <div className="absolute z-[70] left-0 right-0 top-full mt-1 bg-white border border-border rounded-xl shadow-xl max-h-60 overflow-y-auto">
+                                    {filteredProducts.length === 0 ? (
+                                        <div className="p-4 text-center text-muted-foreground text-sm">No se encontraron productos</div>
+                                    ) : (
+                                        filteredProducts.map(p => (
+                                            <button
+                                                key={p.id}
+                                                type="button"
+                                                className="w-full text-left px-4 py-2 hover:bg-secondary/10 flex flex-col border-b border-border last:border-none"
+                                                onClick={() => {
+                                                    setFormData({ ...formData, producto_id: p.id!, precio_unitario: p.precio_ref_usd });
+                                                    setSearchQuery(`${p.nombre} (${p.codigo})`);
+                                                    setShowResults(false);
+                                                }}
+                                            >
+                                                <span className="font-bold text-sm text-foreground">{p.nombre}</span>
+                                                <span className="text-[10px] text-muted-foreground font-mono">{p.codigo}</span>
+                                            </button>
+                                        ))
+                                    )}
+                                </div>
+                            )}
+
+                            {selectedProduct && !showResults && (
+                                <div className="mt-2 p-3 bg-primary/5 border border-primary/20 rounded-xl flex justify-between items-center animate-in fade-in slide-in-from-top-1">
+                                    <div className="flex flex-col">
+                                        <span className="text-xs font-bold text-primary uppercase">Seleccionado:</span>
+                                        <span className="text-sm font-medium">{selectedProduct.nombre}</span>
+                                        <div className="flex items-center space-x-2 mt-0.5">
+                                            <span className="text-[10px] text-muted-foreground uppercase font-bold">Stock actual:</span>
+                                            <span className={cn(
+                                                "text-[10px] font-bold px-1.5 rounded",
+                                                selectedProduct.stock > 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                                            )}>
+                                                {selectedProduct.stock} {selectedProduct.unidad}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded font-mono font-bold">
+                                        {selectedProduct.codigo}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1">
-                                <label className="text-[10px] font-bold uppercase text-muted-foreground">Tasa de Cambio</label>
-                                <div className="relative">
-                                    <input
-                                        type="number" step="any" required
-                                        className="w-full px-3 py-1.5 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 font-bold outline-none"
-                                        value={formData.price_per_dolar}
-                                        onChange={e => setFormData({ ...formData, price_per_dolar: e.target.value as any })}
-                                    />
-                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">Bs/$</span>
-                                </div>
+                                <label className="text-sm font-semibold">Tipo</label>
+                                <select
+                                    className="w-full px-4 py-2 border border-border rounded-xl outline-none focus:ring-2 focus:ring-primary/20"
+                                    value={formData.tipo}
+                                    onChange={e => setFormData({ ...formData, tipo: e.target.value as any })}
+                                >
+                                    <option value="ENTRADA">Entrada / Compra</option>
+                                    <option value="SALIDA">Salida / Venta</option>
+                                </select>
                             </div>
                             <div className="space-y-1">
-                                <label className="text-[10px] font-bold uppercase text-muted-foreground">Total USD</label>
-                                <div className="relative">
+                                <label className="text-sm font-semibold">Cantidad</label>
+                                <div className="flex space-x-2">
                                     <input
-                                        type="number" step="any" required
-                                        className={cn(
-                                            "w-full px-3 py-1.5 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 font-bold outline-none",
-                                            isManualTotal ? "bg-amber-50 border-amber-200" : "bg-white"
-                                        )}
-                                        value={formData.total_usd}
-                                        onChange={e => {
-                                            const val = parseFloat(e.target.value) || 0;
-                                            setFormData({ ...formData, total_usd: val });
-                                            setIsManualTotal(true);
-                                        }}
+                                        type="number" step="any" min="0.001" required
+                                        className="w-full px-4 py-2 border border-border rounded-xl outline-none focus:ring-2 focus:ring-primary/20"
+                                        value={formData.cantidad}
+                                        onChange={e => setFormData({ ...formData, cantidad: parseFloat(e.target.value) || 0 })}
                                     />
-                                    {isManualTotal && (
-                                        <button
-                                            type="button"
-                                            onClick={() => setIsManualTotal(false)}
-                                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-amber-600 hover:bg-amber-100 rounded-md transition-colors"
-                                            title="Restablecer cálculo automático"
-                                        >
-                                            <X size={12} />
-                                        </button>
+                                    {selectedProduct && (
+                                        <span className="flex items-center px-3 py-2 bg-secondary/50 rounded-xl text-sm font-bold text-muted-foreground">
+                                            {selectedProduct.unidad}
+                                        </span>
                                     )}
                                 </div>
                             </div>
                         </div>
 
-                        <div className="flex justify-between items-center pt-2 border-t border-border/50">
-                            <div className="flex flex-col">
-                                <span className="text-[10px] font-bold uppercase text-muted-foreground">Total en Bolívares</span>
-                                <span className="font-black text-foreground">
-                                    {formatCurrency(formData.total_bs || 0, "BS")}
-                                </span>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <label className="text-sm font-semibold">Precio Unitario ($)</label>
+                                <div className="relative">
+                                    <input
+                                        type="number" step="any" min="0" required
+                                        className="w-full px-4 py-2 border border-border rounded-xl outline-none focus:ring-2 focus:ring-primary/20 font-bold text-primary"
+                                        value={formData.precio_unitario}
+                                        onChange={e => {
+                                            setFormData({ ...formData, precio_unitario: parseFloat(e.target.value) || 0 });
+                                            setIsManualTotal(false);
+                                        }}
+                                    />
+                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">$</span>
+                                </div>
                             </div>
-                            <div className="text-right">
-                                <span className="text-[10px] font-bold uppercase text-muted-foreground">Fecha y Hora</span>
-                                <input
-                                    type="datetime-local" required
-                                    className="block w-full bg-transparent text-right text-xs outline-none font-medium"
-                                    value={formData.fecha || ""}
-                                    onChange={e => setFormData({ ...formData, fecha: e.target.value })}
-                                />
+                            <div className="space-y-1">
+                                <label className="text-sm font-semibold text-muted-foreground italic">Ref. Inventario</label>
+                                <div className="px-4 py-2 bg-secondary/30 border border-dashed border-border rounded-xl text-sm font-medium text-muted-foreground">
+                                    {selectedProduct ? formatCurrency(selectedProduct.precio_ref_usd, "USD") : "---"}
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    <div className="space-y-1">
-                        <label className="text-sm font-semibold">Factura (opcional)</label>
-                        <SearchableSelect
-                            options={facturas.map(f => ({
-                                value: String(f.id),
-                                label: `${f.numero} - ${f.fecha} ${f.proveedor ? `(${f.proveedor})` : ""}`
-                            }))}
-                            value={formData.factura_id ? String(formData.factura_id) : ""}
-                            onChange={(val) => setFormData({ ...formData, factura_id: val ? parseInt(val) : null })}
-                            placeholder="Seleccionar factura..."
-                        />
-                    </div>
+                        <div className="p-4 bg-secondary/10 rounded-xl space-y-3">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold uppercase text-muted-foreground">Tasa de Cambio</label>
+                                    <div className="relative">
+                                        <input
+                                            type="number" step="any" required
+                                            className="w-full px-3 py-1.5 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 font-bold outline-none"
+                                            value={formData.price_per_dolar}
+                                            onChange={e => setFormData({ ...formData, price_per_dolar: e.target.value as any })}
+                                        />
+                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">Bs/$</span>
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold uppercase text-muted-foreground">Total USD</label>
+                                    <div className="relative">
+                                        <input
+                                            type="number" step="any" required
+                                            className={cn(
+                                                "w-full px-3 py-1.5 border border-border rounded-lg focus:ring-2 focus:ring-primary/20 font-bold outline-none",
+                                                isManualTotal ? "bg-amber-50 border-amber-200" : "bg-white"
+                                            )}
+                                            value={formData.total_usd}
+                                            onChange={e => {
+                                                const val = parseFloat(e.target.value) || 0;
+                                                setFormData({ ...formData, total_usd: val });
+                                                setIsManualTotal(true);
+                                            }}
+                                        />
+                                        {isManualTotal && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsManualTotal(false)}
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-amber-600 hover:bg-amber-100 rounded-md transition-colors"
+                                                title="Restablecer cálculo automático"
+                                            >
+                                                <X size={12} />
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex justify-between items-center pt-2 border-t border-border/50">
+                                <div className="flex flex-col">
+                                    <span className="text-[10px] font-bold uppercase text-muted-foreground">Total en Bolívares</span>
+                                    <span className="font-black text-foreground">
+                                        {formatCurrency(formData.total_bs || 0, "BS")}
+                                    </span>
+                                </div>
+                                <div className="text-right">
+                                    <span className="text-[10px] font-bold uppercase text-muted-foreground">Fecha y Hora</span>
+                                    <input
+                                        type="datetime-local" required
+                                        className="block w-full bg-transparent text-right text-xs outline-none font-medium"
+                                        value={formData.fecha || ""}
+                                        onChange={e => setFormData({ ...formData, fecha: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+                        </div>
 
-                    <div className="flex justify-between items-center px-4 py-2 bg-primary/5 rounded-lg border border-primary/10">
-                        <span className="text-[10px] font-bold uppercase text-muted-foreground">Ref. BCV</span>
-                        <span className="font-bold text-primary text-sm">{formData.tasa_momento} Bs/$</span>
-                    </div>
+                        <div className="space-y-1">
+                            <label className="text-sm font-semibold">Factura (opcional)</label>
+                            <SearchableSelect
+                                options={facturas.map(f => ({
+                                    value: String(f.id),
+                                    label: `${f.numero} - ${f.fecha} ${f.proveedor ? `(${f.proveedor})` : ""}`
+                                }))}
+                                value={formData.factura_id ? String(formData.factura_id) : ""}
+                                onChange={(val) => setFormData({ ...formData, factura_id: val ? parseInt(val) : null })}
+                                placeholder="Seleccionar factura..."
+                            />
+                        </div>
 
-                    <div className="pt-4 flex justify-end space-x-3">
-                        <button type="button" onClick={onClose} disabled={loading} className="px-6 py-2 text-muted-foreground hover:bg-secondary rounded-xl transition-colors">
-                            Cancelar
-                        </button>
-                        <button type="submit" disabled={loading} className="px-6 py-2 bg-primary text-primary-foreground hover:opacity-90 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">
-                            {loading ? "Procesando..." : "Confirmar"}
-                        </button>
-                    </div>
-                </form>
+                        <div className="flex justify-between items-center px-4 py-2 bg-primary/5 rounded-lg border border-primary/10">
+                            <span className="text-[10px] font-bold uppercase text-muted-foreground">Ref. BCV</span>
+                            <span className="font-bold text-primary text-sm">{formData.tasa_momento} Bs/$</span>
+                        </div>
+
+                        <div className="pt-4 flex justify-end space-x-3">
+                            <button type="button" onClick={onClose} disabled={loading} className="px-6 py-2 text-muted-foreground hover:bg-secondary rounded-xl transition-colors">
+                                Cancelar
+                            </button>
+                            <button type="submit" disabled={loading} className="px-6 py-2 bg-primary text-primary-foreground hover:opacity-90 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50">
+                                {loading ? "Procesando..." : "Confirmar"}
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     );

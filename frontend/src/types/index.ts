@@ -25,6 +25,7 @@ export interface Movimiento {
     producto_id: number;
     tipo: 'ENTRADA' | 'SALIDA';
     cantidad: number;
+    precio_unitario: number;
     tasa_momento: number;
     total_usd: number;
     total_bs: number;

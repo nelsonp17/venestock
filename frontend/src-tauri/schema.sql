@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS movimientos (
     producto_id INTEGER NOT NULL,
     tipo TEXT NOT NULL, -- 'ENTRADA', 'SALIDA'
     cantidad REAL NOT NULL,
+    precio_unitario REAL NOT NULL DEFAULT 0.0,
     tasa_momento REAL NOT NULL,
     total_usd REAL NOT NULL,
     total_bs REAL NOT NULL,

@@ -35,6 +35,10 @@ pub async fn init_db(app_handle: &AppHandle) -> Result<SqlitePool, Box<dyn std::
         .execute(&pool)
         .await;
 
+    let _ = sqlx::query("ALTER TABLE movimientos ADD COLUMN precio_unitario REAL NOT NULL DEFAULT 0.0")
+        .execute(&pool)
+        .await;
+
     // Manual migration: create categorias table if it doesn't exist
     let _ = sqlx::query(
         "CREATE TABLE IF NOT EXISTS categorias (

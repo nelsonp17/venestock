@@ -32,6 +32,7 @@ pub struct Movimiento {
     pub producto_id: i32,
     pub tipo: String,
     pub cantidad: f64,
+    pub precio_unitario: f64,
     pub tasa_momento: f64,
     pub total_usd: f64,
     pub total_bs: f64,

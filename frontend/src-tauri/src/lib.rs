@@ -274,10 +274,11 @@ async fn record_movement(state: State<'_, AppState>, mut mov: Movimiento) -> Res
     let final_fecha = mov.fecha.unwrap_or(now);
     mov.fecha = Some(final_fecha);
 
-    sqlx::query("INSERT INTO movimientos (producto_id, tipo, cantidad, tasa_momento, total_usd, total_bs, price_per_dolar, fecha, factura_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+    sqlx::query("INSERT INTO movimientos (producto_id, tipo, cantidad, precio_unitario, tasa_momento, total_usd, total_bs, price_per_dolar, fecha, factura_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
         .bind(mov.producto_id)
         .bind(&mov.tipo)
         .bind(mov.cantidad)
+        .bind(mov.precio_unitario)
         .bind(mov.tasa_momento)
         .bind(mov.total_usd)
         .bind(mov.total_bs)
