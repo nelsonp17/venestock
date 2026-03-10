@@ -1,8 +1,9 @@
-import { LayoutDashboard, Package, History, FileText, Database, Tags, Info } from "lucide-react";
+import { LayoutDashboard, Package, History, FileText, Database, Tags, Info, ShoppingCart } from "lucide-react";
 import { cn } from "../lib/utils";
 
 const menuItems = [
     { icon: LayoutDashboard, label: "Dashboard", id: "dashboard" },
+    { icon: ShoppingCart, label: "Punto de Venta", id: "pos" },
     { icon: Package, label: "Inventario", id: "inventory" },
     { icon: History, label: "Movimientos", id: "movements" },
     { icon: FileText, label: "Facturas", id: "facturas" },

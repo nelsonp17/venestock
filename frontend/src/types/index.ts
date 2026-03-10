@@ -1,27 +1,27 @@
 export interface Producto {
-    id: number | null;
+    id?: null | number;
     codigo: string;
-    barras: string | null;
+    barras?: string;
     nombre: string;
-    descripcion: string | null;
+    descripcion?: string;
     precio_ref_usd: number;
     precio_bs: number;
-    categoria: string | null;
-    subcategoria: string | null;
+    categoria?: string;
+    subcategoria?: string;
     stock: number;
     unidad: string;
     price_per_dolar: number;
 }
 
 export interface Tasa {
-    id: number | null;
+    id?: number;
     valor: number;
     fecha: string;
     fuente: string;
 }
 
 export interface Movimiento {
-    id: number | null;
+    id?: number;
     producto_id: number;
     tipo: 'ENTRADA' | 'SALIDA';
     cantidad: number;
@@ -30,27 +30,57 @@ export interface Movimiento {
     total_usd: number;
     total_bs: number;
     price_per_dolar: number;
-    fecha: string | null;
-    factura_id: number | null;
+    fecha?: string;
+    factura_id?: number;
+}
+
+export interface Categoria {
+    id?: number;
+    nombre: string;
+}
+
+export interface Subcategoria {
+    id?: number;
+    nombre: string;
+    categoria_id: number;
 }
 
 export interface Factura {
-    id: number | null;
+    id?: number;
     numero: string;
     fecha: string;
-    proveedor: string | null;
-    observaciones: string | null;
-    created_at: string | null;
+    proveedor?: string;
+    tipo: 'COMPRA' | 'VENTA';
+    observaciones?: string;
+    created_at?: string;
 }
 
-export interface FacturaItem {
-    id: number;
-    producto_id: number;
-    producto_nombre: string;
-    producto_codigo: string;
-    cantidad: number;
-    total_usd: number;
-    total_bs: number;
-    tipo: 'ENTRADA' | 'SALIDA';
-    precio_unitario_usd: number;
+export interface Cliente {
+    id?: number;
+    cedula: string;
+    nombre: string;
+    apellido: string;
+    telefono?: string;
+    correo?: string;
+}
+
+export interface MetodoPago {
+    id?: number;
+    nombre: string;
+}
+
+export interface PagoFactura {
+    id?: number;
+    factura_id?: number;
+    metodo_id: number;
+    monto: number;
+    tasa_referencia: number;
+    moneda: 'USD' | 'BS';
+}
+
+export interface VentaPayload {
+    factura: Partial<Factura>;
+    items: Movimiento[];
+    pagos: Partial<PagoFactura>[];
+    cliente_id?: number;
 }

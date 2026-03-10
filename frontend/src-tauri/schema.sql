@@ -38,9 +38,48 @@ CREATE TABLE IF NOT EXISTS facturas (
     numero TEXT UNIQUE NOT NULL,
     fecha DATE NOT NULL,
     proveedor TEXT,
+    tipo TEXT NOT NULL DEFAULT 'COMPRA', -- 'COMPRA' o 'VENTA'
     observaciones TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS clientes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    cedula TEXT UNIQUE NOT NULL,
+    nombre TEXT NOT NULL,
+    apellido TEXT NOT NULL,
+    telefono TEXT,
+    correo TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS factura_cliente (
+    factura_id INTEGER PRIMARY KEY,
+    cliente_id INTEGER NOT NULL,
+    FOREIGN KEY(factura_id) REFERENCES facturas(id) ON DELETE CASCADE,
+    FOREIGN KEY(cliente_id) REFERENCES clientes(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS metodos_pago (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre TEXT UNIQUE NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS pagos_factura (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    factura_id INTEGER NOT NULL,
+    metodo_id INTEGER NOT NULL,
+    monto REAL NOT NULL,
+    tasa_referencia REAL NOT NULL,
+    moneda TEXT NOT NULL, -- 'USD' o 'BS'
+    FOREIGN KEY(factura_id) REFERENCES facturas(id) ON DELETE CASCADE,
+    FOREIGN KEY(metodo_id) REFERENCES metodos_pago(id)
+);
+
+-- Insertar métodos de pago iniciales
+INSERT OR IGNORE INTO metodos_pago (nombre) VALUES 
+('Efectivo USD'), ('Efectivo BS'), ('Pago Móvil'), ('Zelle'), 
+('Punto de Venta'), ('PayPal'), ('BioPago');
 
 CREATE TABLE IF NOT EXISTS movimientos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

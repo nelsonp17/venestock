@@ -39,6 +39,23 @@ pub async fn init_db(app_handle: &AppHandle) -> Result<SqlitePool, Box<dyn std::
         .execute(&pool)
         .await;
 
+    // Migración para POS: Añadir columna 'tipo' a facturas si no existe
+    let _ = sqlx::query("ALTER TABLE facturas ADD COLUMN tipo TEXT NOT NULL DEFAULT 'COMPRA'")
+        .execute(&pool)
+        .await;
+
+    // Asegurar que existan los métodos de pago iniciales
+    let _ = sqlx::query("INSERT OR IGNORE INTO metodos_pago (nombre) VALUES 
+        ('Efectivo USD'), ('Efectivo BS'), ('Pago Móvil'), ('Zelle'), 
+        ('Punto de Venta'), ('PayPal'), ('BioPago')")
+        .execute(&pool)
+        .await;
+
+    // Eliminar Binance si existía anteriormente
+    let _ = sqlx::query("DELETE FROM metodos_pago WHERE nombre = 'Binance'")
+        .execute(&pool)
+        .await;
+
     // Manual migration: create categorias table if it doesn't exist
     let _ = sqlx::query(
         "CREATE TABLE IF NOT EXISTS categorias (

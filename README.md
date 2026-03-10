@@ -5,10 +5,24 @@ VenoStock es una aplicación de escritorio diseñada para el control administrat
 ## 🚀 Características Críticas
 
 - **Inventario Multimoneda**: Gestión de productos con precios de referencia en USD y cálculo automático en Bolívares (VES).
+- **Módulo POS (Punto de Venta)**: Interfaz ultra-rápida optimizada para teclado y escáner de códigos de barras.
+- **Gestión de Clientes**: Registro rápido de clientes (Cédula, Nombre, Apellido) con soporte para ventas anónimas.
+- **Pagos Multimetodo**: Soporte para pagos mixtos en Efectivo (USD/VES), Pago Móvil, Zelle, Punto de Venta, PayPal, BioPago y Binance.
 - **Scraping del BCV**: Módulo integrado para obtener la tasa oficial del Banco Central de Venezuela con un solo clic.
 - **Movimientos de Stock**: Registro histórico de entradas y salidas que afecta automáticamente las existencias.
 - **Etiquetado e Impresión**: Generación de etiquetas con códigos de barras y precios actualizados listos para su uso.
 - **Reportes Profesionales**: Exportación de inventario y movimientos a formatos PDF y Excel.
+
+## ⌨️ Atajos de Teclado (POS)
+
+| Tecla | Acción |
+|-------|--------|
+| `F1` | Buscar Producto manualmente |
+| `F2` | Buscar/Registrar Cliente |
+| `F12` | Procesar Pago / Cobrar |
+| `Esc` | Cancelar Venta / Limpiar |
+| `+` / `-` | Ajustar cantidades en el carrito |
+| `Supr` | Eliminar item seleccionado |
 
 ## 🛠️ Tecnologías Utilizadas
 

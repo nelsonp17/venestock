@@ -9,6 +9,7 @@ import { FacturasView } from "./views/FacturasView";
 import { DatabaseView } from "./views/DatabaseView";
 import { CategoriesView } from "./views/CategoriesView";
 import { DashboardView } from "./views/DashboardView";
+import { POSView } from "./views/POSView";
 import { AboutView } from "./views/AboutView";
 import { LicenseGuard } from "./components/LicenseGuard";
 
@@ -22,6 +23,9 @@ function App() {
 
         <main className="flex-1 overflow-auto bg-gray-100">
           <DashboardView active={activeTab === "dashboard"} />
+          <div className={cn("transition-all duration-300", activeTab === "pos" ? "block" : "hidden")}>
+            <POSView active={activeTab === "pos"} />
+          </div>
           <div className={cn("transition-all duration-300", activeTab === "inventory" ? "block" : "hidden")}>
             <InventoryView active={activeTab === "inventory"} />
           </div>

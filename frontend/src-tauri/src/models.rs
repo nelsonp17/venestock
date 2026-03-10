@@ -60,6 +60,33 @@ pub struct Factura {
     pub numero: String,
     pub fecha: String,
     pub proveedor: Option<String>,
+    pub tipo: String, // 'COMPRA' o 'VENTA'
     pub observaciones: Option<String>,
     pub created_at: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, FromRow, Clone)]
+pub struct Cliente {
+    pub id: Option<i32>,
+    pub cedula: String,
+    pub nombre: String,
+    pub apellido: String,
+    pub telefono: Option<String>,
+    pub correo: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, FromRow, Clone)]
+pub struct MetodoPago {
+    pub id: Option<i32>,
+    pub nombre: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, FromRow, Clone)]
+pub struct PagoFactura {
+    pub id: Option<i32>,
+    pub factura_id: Option<i32>,
+    pub metodo_id: i32,
+    pub monto: f64,
+    pub tasa_referencia: f64,
+    pub moneda: String,
 }

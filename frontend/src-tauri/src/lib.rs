@@ -602,20 +602,22 @@ async fn get_facturas(state: State<'_, AppState>) -> Result<Vec<Factura>, String
 #[tauri::command]
 async fn upsert_factura(state: State<'_, AppState>, mut factura: Factura) -> Result<Factura, String> {
     if let Some(id) = factura.id {
-        sqlx::query("UPDATE facturas SET numero = ?, fecha = ?, proveedor = ?, observaciones = ? WHERE id = ?")
+        sqlx::query("UPDATE facturas SET numero = ?, fecha = ?, proveedor = ?, tipo = ?, observaciones = ? WHERE id = ?")
             .bind(&factura.numero)
             .bind(&factura.fecha)
             .bind(&factura.proveedor)
+            .bind(&factura.tipo)
             .bind(&factura.observaciones)
             .bind(id)
             .execute(&state.db)
             .await
             .map_err(|e| e.to_string())?;
     } else {
-        let result = sqlx::query("INSERT INTO facturas (numero, fecha, proveedor, observaciones) VALUES (?, ?, ?, ?)")
+        let result = sqlx::query("INSERT INTO facturas (numero, fecha, proveedor, tipo, observaciones) VALUES (?, ?, ?, ?, ?)")
             .bind(&factura.numero)
             .bind(&factura.fecha)
             .bind(&factura.proveedor)
+            .bind(&factura.tipo)
             .bind(&factura.observaciones)
             .execute(&state.db)
             .await
@@ -623,6 +625,154 @@ async fn upsert_factura(state: State<'_, AppState>, mut factura: Factura) -> Res
         factura.id = Some(result.last_insert_rowid() as i32);
     }
     Ok(factura)
+}
+
+// ── Clientes CRUD ────────────────────────────────────────────────────────────
+
+#[tauri::command]
+async fn get_clientes(state: State<'_, AppState>) -> Result<Vec<models::Cliente>, String> {
+    sqlx::query_as::<_, models::Cliente>("SELECT * FROM clientes ORDER BY apellido, nombre")
+        .fetch_all(&state.db)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_cliente_by_cedula(state: State<'_, AppState>, cedula: String) -> Result<Option<models::Cliente>, String> {
+    sqlx::query_as::<_, models::Cliente>("SELECT * FROM clientes WHERE cedula = ?")
+        .bind(cedula)
+        .fetch_optional(&state.db)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn upsert_cliente(state: State<'_, AppState>, mut cliente: models::Cliente) -> Result<models::Cliente, String> {
+    if let Some(id) = cliente.id {
+        sqlx::query("UPDATE clientes SET cedula = ?, nombre = ?, apellido = ?, telefono = ?, correo = ? WHERE id = ?")
+            .bind(&cliente.cedula)
+            .bind(&cliente.nombre)
+            .bind(&cliente.apellido)
+            .bind(&cliente.telefono)
+            .bind(&cliente.correo)
+            .bind(id)
+            .execute(&state.db)
+            .await
+            .map_err(|e| e.to_string())?;
+    } else {
+        let result = sqlx::query("INSERT INTO clientes (cedula, nombre, apellido, telefono, correo) VALUES (?, ?, ?, ?, ?)")
+            .bind(&cliente.cedula)
+            .bind(&cliente.nombre)
+            .bind(&cliente.apellido)
+            .bind(&cliente.telefono)
+            .bind(&cliente.correo)
+            .execute(&state.db)
+            .await
+            .map_err(|e| e.to_string())?;
+        cliente.id = Some(result.last_insert_rowid() as i32);
+    }
+    Ok(cliente)
+}
+
+// ── POS Lógica ───────────────────────────────────────────────────────────────
+
+#[tauri::command]
+async fn get_metodos_pago(state: State<'_, AppState>) -> Result<Vec<models::MetodoPago>, String> {
+    sqlx::query_as::<_, models::MetodoPago>("SELECT * FROM metodos_pago ORDER BY id")
+        .fetch_all(&state.db)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[derive(serde::Deserialize)]
+struct VentaPayload {
+    factura: Factura,
+    items: Vec<Movimiento>,
+    pagos: Vec<models::PagoFactura>,
+    cliente_id: Option<i32>,
+}
+
+#[tauri::command]
+async fn procesar_venta(state: State<'_, AppState>, payload: VentaPayload) -> Result<i32, String> {
+    let mut tx = state.db.begin().await.map_err(|e| e.to_string())?;
+
+    // 1. Insertar Factura
+    let result = sqlx::query("INSERT INTO facturas (numero, fecha, tipo, observaciones) VALUES (?, ?, 'VENTA', ?)")
+        .bind(&payload.factura.numero)
+        .bind(&payload.factura.fecha)
+        .bind(&payload.factura.observaciones)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| e.to_string())?;
+    
+    let factura_id = result.last_insert_rowid() as i32;
+
+    // 2. Asociar Cliente si existe
+    if let Some(cid) = payload.cliente_id {
+        sqlx::query("INSERT INTO factura_cliente (factura_id, cliente_id) VALUES (?, ?)")
+            .bind(factura_id)
+            .bind(cid)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+
+    // 3. Registrar Movimientos (Salidas) y actualizar Stock
+    for mov in payload.items {
+        // Verificar stock actual
+        let current_stock: f64 = sqlx::query_scalar("SELECT stock FROM productos WHERE id = ?")
+            .bind(mov.producto_id)
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        if current_stock < mov.cantidad {
+            let nombre_prod: String = sqlx::query_scalar("SELECT nombre FROM productos WHERE id = ?")
+                .bind(mov.producto_id)
+                .fetch_one(&mut *tx)
+                .await
+                .map_err(|e| e.to_string())?;
+            
+            return Err(format!("Stock insuficiente para '{}'. Disponible: {}, Solicitado: {}", nombre_prod, current_stock, mov.cantidad));
+        }
+
+        sqlx::query("INSERT INTO movimientos (producto_id, tipo, cantidad, precio_unitario, tasa_momento, total_usd, total_bs, price_per_dolar, fecha, factura_id) VALUES (?, 'SALIDA', ?, ?, ?, ?, ?, ?, ?, ?)")
+            .bind(mov.producto_id)
+            .bind(mov.cantidad)
+            .bind(mov.precio_unitario)
+            .bind(mov.tasa_momento)
+            .bind(mov.total_usd)
+            .bind(mov.total_bs)
+            .bind(mov.price_per_dolar)
+            .bind(payload.factura.fecha.clone())
+            .bind(factura_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        sqlx::query("UPDATE productos SET stock = stock - ? WHERE id = ?")
+            .bind(mov.cantidad)
+            .bind(mov.producto_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+
+    // 4. Registrar Pagos
+    for pago in payload.pagos {
+        sqlx::query("INSERT INTO pagos_factura (factura_id, metodo_id, monto, tasa_referencia, moneda) VALUES (?, ?, ?, ?, ?)")
+            .bind(factura_id)
+            .bind(pago.metodo_id)
+            .bind(pago.monto)
+            .bind(pago.tasa_referencia)
+            .bind(pago.moneda)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+
+    tx.commit().await.map_err(|e| e.to_string())?;
+    Ok(factura_id)
 }
 
 #[tauri::command]
@@ -760,7 +910,12 @@ pub fn run() {
             upsert_factura,
             delete_factura,
             get_factura_items,
-            get_machine_id
+            get_machine_id,
+            get_clientes,
+            get_cliente_by_cedula,
+            upsert_cliente,
+            get_metodos_pago,
+            procesar_venta
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
