@@ -312,7 +312,7 @@ export function InventoryView({ active }: { active?: boolean }) {
                                         {formatCurrency(p.precio_bs, "BS")}
                                     </td>
                                     <td className="px-6 py-4 text-center font-bold">
-                                        {p.stock} <span className="text-[10px] text-muted-foreground ml-1">{p.unidad}</span>
+                                        {Number(p.stock.toFixed(3))} <span className="text-[10px] text-muted-foreground ml-1">{p.unidad}</span>
                                     </td>
                                     <td className="px-6 py-4">
                                         <div className="flex justify-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">

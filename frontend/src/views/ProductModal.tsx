@@ -116,8 +116,19 @@ export function ProductModal({ isOpen, onClose, onSave, product }: ProductModalP
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
+            // Aplicar redondeo inteligente al stock basado en la unidad
+            let cleanStock = parseFloat(formData.stock.toString()) || 0;
+            const isUnit = formData.unidad.toUpperCase() === "UNID" || formData.unidad.toUpperCase() === "PAQ" || formData.unidad.toUpperCase() === "PZA";
+
+            if (isUnit) {
+                cleanStock = Math.round(cleanStock);
+            } else {
+                cleanStock = Math.round(cleanStock * 1000) / 1000;
+            }
+
             const finalData = {
                 ...formData,
+                stock: cleanStock,
                 precio_ref_usd: typeof formData.precio_ref_usd === 'string' ? (parseFloat(formData.precio_ref_usd) || 0) : formData.precio_ref_usd
             };
 
