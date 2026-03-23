@@ -27,12 +27,20 @@ export function DatabaseView({ active }: { active: boolean }) {
 
             const productosCSV = toCSV(data.productos);
             const movimientosCSV = toCSV(data.movimientos);
+            const facturasCSV = toCSV(data.facturas);
+            const clientesCSV = toCSV(data.clientes);
+            const pagosCSV = toCSV(data.pagos);
+            const facturaClientesCSV = toCSV(data.factura_clientes);
             const categoriasCSV = toCSV(data.categorias);
             const subcategoriasCSV = toCSV(data.subcategorias);
 
             const fullContent = [
                 `--- PRODUCTOS ---\n${productosCSV}`,
                 `--- MOVIMIENTOS ---\n${movimientosCSV}`,
+                `--- FACTURAS ---\n${facturasCSV}`,
+                `--- CLIENTES ---\n${clientesCSV}`,
+                `--- PAGOS ---\n${pagosCSV}`,
+                `--- FACTURA_CLIENTES ---\n${facturaClientesCSV}`,
                 `--- CATEGORIAS ---\n${categoriasCSV}`,
                 `--- SUBCATEGORIAS ---\n${subcategoriasCSV}`,
             ].join("\n\n");
@@ -67,7 +75,12 @@ export function DatabaseView({ active }: { active: boolean }) {
                     if (lines.length < 2) return [];
 
                     const headers = lines[0].split(',').map(h => h.trim());
-                    const numericalFields = ['id', 'producto_id', 'categoria_id', 'cantidad', 'tasa_momento', 'total_usd', 'total_bs', 'price_per_dolar', 'precio_ref_usd', 'precio_bs', 'stock'];
+                    const numericalFields = [
+                        'id', 'producto_id', 'categoria_id', 'factura_id', 'cliente_id', 'metodo_id',
+                        'cantidad', 'precio_unitario', 'tasa_momento', 'total_usd', 'total_bs',
+                        'price_per_dolar', 'precio_ref_usd', 'precio_bs', 'stock',
+                        'monto', 'tasa_referencia'
+                    ];
 
                     return lines.slice(1).map(line => {
                         const values = line.split(',');
@@ -98,19 +111,23 @@ export function DatabaseView({ active }: { active: boolean }) {
 
                 const productos = parseSection(getSection(text, "PRODUCTOS"));
                 const movimientos = parseSection(getSection(text, "MOVIMIENTOS"));
+                const facturas = parseSection(getSection(text, "FACTURAS"));
+                const clientes = parseSection(getSection(text, "CLIENTES"));
+                const pagos = parseSection(getSection(text, "PAGOS"));
+                const factura_clientes = parseSection(getSection(text, "FACTURA_CLIENTES"));
                 const categorias = parseSection(getSection(text, "CATEGORIAS"));
                 const subcategorias = parseSection(getSection(text, "SUBCATEGORIAS"));
 
-                console.log("Importing:", { productos, movimientos, categorias, subcategorias });
+                console.log("Importing:", { productos, movimientos, categorias, subcategorias, facturas, clientes, pagos, factura_clientes });
 
-                if (productos.length === 0 && movimientos.length === 0 && categorias.length === 0) {
+                if (productos.length === 0 && movimientos.length === 0 && categorias.length === 0 && facturas.length === 0 && clientes.length === 0) {
                     throw new Error("No se encontraron datos válidos en el archivo.");
                 }
 
-                await invoke("import_data", { productos, movimientos, categorias, subcategorias });
+                await invoke("import_data", { productos, movimientos, categorias, subcategorias, facturas, clientes, pagos, factura_clientes });
                 setStatus({
                     type: 'success',
-                    message: `Importación exitosa: ${productos.length} productos, ${movimientos.length} movimientos, ${categorias.length} categorías y ${subcategorias.length} subcategorías.`
+                    message: `Importación exitosa: ${productos.length} productos, ${movimientos.length} mov., ${facturas.length} fact. y ${clientes.length} clnt.`
                 });
             } catch (err) {
                 console.error("Import error:", err);
@@ -163,7 +180,7 @@ export function DatabaseView({ active }: { active: boolean }) {
                         </div>
                         <h3 className="text-xl font-bold mb-2">Exportar CSV</h3>
                         <p className="text-sm text-muted-foreground mb-6">
-                            Descarga una copia de seguridad completa de tus productos, movimientos, categorías y subcategorías en formato CSV.
+                            Descarga una copia de seguridad completa de tus productos, movimientos, facturas, clientes y categorías en formato CSV.
                         </p>
                     </div>
                     <button
@@ -202,7 +219,7 @@ export function DatabaseView({ active }: { active: boolean }) {
                         </div>
                         <h3 className="text-xl font-bold mb-2 text-destructive">Limpiar Sistema</h3>
                         <p className="text-sm text-muted-foreground mb-6">
-                            Elimina por completo todos los productos, movimientos, categorías y registros. <span className="font-bold">Esta acción no se puede deshacer.</span>
+                            Elimina por completo todos los productos, movimientos, facturas, clientes y registros. <span className="font-bold">Esta acción no se puede deshacer.</span>
                         </p>
                     </div>
                     <button
@@ -227,8 +244,9 @@ export function DatabaseView({ active }: { active: boolean }) {
                             <p className="text-muted-foreground mb-6 leading-relaxed">
                                 Esta acción borrará permanentemente todos los <span className="font-bold text-foreground">productos</span>,{" "}
                                 <span className="font-bold text-foreground">movimientos</span>,{" "}
-                                <span className="font-bold text-foreground">categorías</span>,{" "}
-                                <span className="font-bold text-foreground">subcategorías</span> e{" "}
+                                <span className="font-bold text-foreground">facturas</span>,{" "}
+                                <span className="font-bold text-foreground">clientes</span>,{" "}
+                                <span className="font-bold text-foreground">categorías</span> e{" "}
                                 <span className="font-bold text-foreground">historial de tasas</span> del sistema.
                                 No existe forma de recuperar esta información a menos que tengas un respaldo previo.
                             </p>

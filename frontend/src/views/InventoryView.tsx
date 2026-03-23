@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Plus, Search, Edit2, Trash2, Calculator, QrCode, FileText, FileSpreadsheet, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, Calculator, QrCode, FileText, FileSpreadsheet, ChevronLeft, ChevronRight, Eye } from "lucide-react";
 import { formatCurrency, cn } from "../lib/utils";
 import { ProductModal } from "./ProductModal.tsx";
+import { ProductDetailsModal } from "./ProductDetailsModal.tsx";
 import { LabelModal } from "./LabelModal.tsx";
 import { RecalculateModal } from "./RecalculateModal.tsx";
 import { jsPDF } from "jspdf";
@@ -17,10 +18,12 @@ export function InventoryView({ active }: { active?: boolean }) {
     const [productos, setProductos] = useState<Producto[]>([]);
     const [search, setSearch] = useState("");
     const [loading, setLoading] = useState(true);
+    const [editingProduct, setEditingProduct] = useState<Producto | null>(null);
+    const [viewingProduct, setViewingProduct] = useState<Producto | null>(null);
     const [modalOpen, setModalOpen] = useState(false);
+    const [viewModalOpen, setViewModalOpen] = useState(false);
     const [labelOpen, setLabelOpen] = useState(false);
     const [recalculateOpen, setRecalculateOpen] = useState(false);
-    const [editingProduct, setEditingProduct] = useState<Producto | null>(null);
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
     const [productToDelete, setProductToDelete] = useState<Producto | null>(null);
     const [tasa, setTasa] = useState<{ valor: number; fuente: string; fecha: string } | null>(null);
@@ -317,6 +320,13 @@ export function InventoryView({ active }: { active?: boolean }) {
                                     <td className="px-6 py-4">
                                         <div className="flex justify-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <button
+                                                onClick={() => { setViewingProduct(p); setViewModalOpen(true); }}
+                                                className="p-1.5 text-muted-foreground hover:text-primary transition-colors"
+                                                title="Ver detalles"
+                                            >
+                                                <Eye size={16} />
+                                            </button>
+                                            <button
                                                 onClick={() => { setEditingProduct(p); setModalOpen(true); }}
                                                 className="p-1.5 text-muted-foreground hover:text-primary transition-colors"
                                             >
@@ -369,6 +379,12 @@ export function InventoryView({ active }: { active?: boolean }) {
                 onClose={() => setModalOpen(false)}
                 onSave={fetchProductos}
                 product={editingProduct}
+            />
+
+            <ProductDetailsModal
+                isOpen={viewModalOpen}
+                onClose={() => setViewModalOpen(false)}
+                product={viewingProduct}
             />
 
             <LabelModal

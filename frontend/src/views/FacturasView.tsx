@@ -82,6 +82,7 @@ export function FacturasView({ active }: { active: boolean }) {
             id: formData.id || null,
             numero: formData.numero || "",
             fecha: formData.fecha || "",
+            tipo: formData.tipo || "COMPRA",
             proveedor: formData.proveedor || null,
             observaciones: formData.observaciones || null,
             created_at: null
@@ -228,8 +229,8 @@ export function FacturasView({ active }: { active: boolean }) {
                                         </td>
                                         <td className="px-6 py-4">
                                             <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${item.tipo === 'ENTRADA'
-                                                    ? 'bg-emerald-100 text-emerald-700'
-                                                    : 'bg-orange-100 text-orange-700'
+                                                ? 'bg-emerald-100 text-emerald-700'
+                                                : 'bg-orange-100 text-orange-700'
                                                 }`}>
                                                 {item.tipo}
                                             </span>

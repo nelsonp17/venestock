@@ -89,3 +89,8 @@ pub struct PagoFactura {
     pub tasa_referencia: f64,
     pub moneda: String,
 }
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FacturaCliente {
+    pub factura_id: i32,
+    pub cliente_id: i32,
+}

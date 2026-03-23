@@ -2,7 +2,7 @@ mod db;
 mod models;
 mod scraper;
 
-use models::{Producto, Tasa, Movimiento, Factura};
+use models::{Producto, Tasa, Movimiento, Factura, Cliente, PagoFactura, FacturaCliente};
 use libsql::{Database, Connection};
 use tauri::{Manager, State};
 use base64::{Engine as _, engine::general_purpose};
@@ -337,9 +337,10 @@ async fn save_export_file(app: tauri::AppHandle, filename: String, base64_data: 
 async fn export_data(state: State<'_, AppState>) -> Result<serde_json::Value, String> {
     let conn = get_conn(&state)?;
     
-    // Función helper para exportar tablas
     let productos = get_productos(state.clone()).await?;
     let movimientos = get_movements(state.clone()).await?;
+    let facturas = get_facturas(state.clone()).await?;
+    let clientes = get_clientes(state.clone()).await?;
     
     let mut tasas = Vec::new();
     let mut rows = conn.query("SELECT id, valor, fecha, fuente FROM tasas", ()).await.map_err(|e| e.to_string())?;
@@ -365,36 +366,127 @@ async fn export_data(state: State<'_, AppState>) -> Result<serde_json::Value, St
         subcategorias.push(models::Subcategoria { id: row.get(0).ok(), nombre: row.get(1).map_err(|e| e.to_string())?, categoria_id: row.get(2).map_err(|e| e.to_string())? });
     }
 
-    Ok(serde_json::json!({ "productos": productos, "movimientos": movimientos, "tasas": tasas, "categorias": categorias, "subcategorias": subcategorias }))
+    let mut pagos = Vec::new();
+    let mut rows = conn.query("SELECT id, factura_id, metodo_id, monto, tasa_referencia, moneda FROM pagos_factura", ()).await.map_err(|e| e.to_string())?;
+    while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
+        pagos.push(PagoFactura {
+            id: row.get(0).ok(),
+            factura_id: row.get(1).ok(),
+            metodo_id: row.get(2).map_err(|e| e.to_string())?,
+            monto: row.get(3).map_err(|e| e.to_string())?,
+            tasa_referencia: row.get(4).map_err(|e| e.to_string())?,
+            moneda: row.get(5).map_err(|e| e.to_string())?,
+        });
+    }
+
+    let mut factura_clientes = Vec::new();
+    let mut rows = conn.query("SELECT factura_id, cliente_id FROM factura_cliente", ()).await.map_err(|e| e.to_string())?;
+    while let Some(row) = rows.next().await.map_err(|e| e.to_string())? {
+        factura_clientes.push(FacturaCliente {
+            factura_id: row.get(0).map_err(|e| e.to_string())?,
+            cliente_id: row.get(1).map_err(|e| e.to_string())?,
+        });
+    }
+
+    Ok(serde_json::json!({ 
+        "productos": productos, 
+        "movimientos": movimientos, 
+        "tasas": tasas, 
+        "categorias": categorias, 
+        "subcategorias": subcategorias,
+        "facturas": facturas,
+        "clientes": clientes,
+        "pagos": pagos,
+        "factura_clientes": factura_clientes
+    }))
 }
 
 #[tauri::command]
-async fn import_data(state: State<'_, AppState>, productos: Vec<Producto>, movimientos: Vec<Movimiento>, categorias: Vec<models::Categoria>, subcategorias: Vec<models::Subcategoria>) -> Result<(), String> {
+async fn import_data(
+    state: State<'_, AppState>, 
+    productos: Vec<Producto>, 
+    movimientos: Vec<Movimiento>, 
+    categorias: Vec<models::Categoria>, 
+    subcategorias: Vec<models::Subcategoria>,
+    facturas: Option<Vec<Factura>>,
+    clientes: Option<Vec<Cliente>>,
+    pagos: Option<Vec<PagoFactura>>,
+    factura_clientes: Option<Vec<FacturaCliente>>
+) -> Result<(), String> {
     let conn = get_conn(&state)?;
+    
+    // Categorias and Subcategorias
     for cat in categorias { conn.execute("INSERT OR REPLACE INTO categorias (id, nombre) VALUES (?, ?)", (cat.id, cat.nombre)).await.map_err(|e| e.to_string())?; }
     for sub in subcategorias { conn.execute("INSERT OR REPLACE INTO subcategorias (id, nombre, categoria_id) VALUES (?, ?, ?)", (sub.id, sub.nombre, sub.categoria_id)).await.map_err(|e| e.to_string())?; }
+    
+    // Clientes
+    if let Some(c_list) = clientes {
+        for c in c_list {
+            conn.execute("INSERT OR REPLACE INTO clientes (id, cedula, nombre, apellido, telefono, correo) VALUES (?, ?, ?, ?, ?, ?)", 
+                (c.id, c.cedula, c.nombre, c.apellido, c.telefono, c.correo)
+            ).await.map_err(|e| e.to_string())?;
+        }
+    }
+
+    // Facturas
+    if let Some(f_list) = facturas {
+        for f in f_list {
+            conn.execute("INSERT OR REPLACE INTO facturas (id, numero, fecha, proveedor, tipo, observaciones) VALUES (?, ?, ?, ?, ?, ?)", 
+                (f.id, f.numero, f.fecha, f.proveedor, f.tipo, f.observaciones)
+            ).await.map_err(|e| e.to_string())?;
+        }
+    }
+
+    // Productos
     for prod in productos { 
         conn.execute("INSERT OR REPLACE INTO productos (id, codigo, barras, nombre, descripcion, precio_ref_usd, precio_bs, categoria, subcategoria, stock, unidad, price_per_dolar) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", 
             (prod.id, prod.codigo, prod.barras, prod.nombre, prod.descripcion, prod.precio_ref_usd, prod.precio_bs, prod.categoria, prod.subcategoria, prod.stock, prod.unidad, prod.price_per_dolar)
         ).await.map_err(|e| e.to_string())?; 
     }
+
+    // Movimientos
     for mov in movimientos { 
         let fecha_str = mov.fecha.map(|f| f.format("%Y-%m-%d %H:%M:%S").to_string());
-        conn.execute("INSERT OR REPLACE INTO movimientos (id, producto_id, tipo, cantidad, tasa_momento, total_usd, total_bs, price_per_dolar, fecha, factura_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", 
-            (mov.id, mov.producto_id, mov.tipo, mov.cantidad, mov.tasa_momento, mov.total_usd, mov.total_bs, mov.price_per_dolar, fecha_str, mov.factura_id)
+        conn.execute("INSERT OR REPLACE INTO movimientos (id, producto_id, tipo, cantidad, precio_unitario, tasa_momento, total_usd, total_bs, price_per_dolar, fecha, factura_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", 
+            (mov.id, mov.producto_id, mov.tipo, mov.cantidad, mov.precio_unitario, mov.tasa_momento, mov.total_usd, mov.total_bs, mov.price_per_dolar, fecha_str, mov.factura_id)
         ).await.map_err(|e| e.to_string())?; 
     }
+
+    // Pagos
+    if let Some(p_list) = pagos {
+        for p in p_list {
+            conn.execute("INSERT OR REPLACE INTO pagos_factura (id, factura_id, metodo_id, monto, tasa_referencia, moneda) VALUES (?, ?, ?, ?, ?, ?)", 
+                (p.id, p.factura_id, p.metodo_id, p.monto, p.tasa_referencia, p.moneda)
+            ).await.map_err(|e| e.to_string())?;
+        }
+    }
+
+    // FacturaCliente
+    if let Some(fc_list) = factura_clientes {
+        for fc in fc_list {
+            conn.execute("INSERT OR REPLACE INTO factura_cliente (factura_id, cliente_id) VALUES (?, ?)", 
+                (fc.factura_id, fc.cliente_id)
+            ).await.map_err(|e| e.to_string())?;
+        }
+    }
+
     Ok(())
 }
 
 #[tauri::command]
 async fn clear_database(state: State<'_, AppState>) -> Result<(), String> {
     let conn = get_conn(&state)?;
+    conn.execute("DELETE FROM pagos_factura", ()).await.map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM factura_cliente", ()).await.map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM movimientos", ()).await.map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM facturas", ()).await.map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM clientes", ()).await.map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM productos", ()).await.map_err(|e| e.to_string())?;
-    conn.execute("DELETE FROM tasas", ()).await.map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM subcategorias", ()).await.map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM categorias", ()).await.map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM tasas", ()).await.map_err(|e| e.to_string())?;
+    // Re-insertar tasa por defecto
+    conn.execute("INSERT INTO tasas (valor, fecha, fuente) VALUES (1.0, '2000-01-01 00:00:00', 'SISTEMA')", ()).await.map_err(|e| e.to_string())?;
     Ok(())
 }
 

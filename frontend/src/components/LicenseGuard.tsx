@@ -12,6 +12,30 @@ export function LicenseGuard({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         checkLocalLicense();
+
+        // Verificación periódica cada minuto
+        const interval = setInterval(() => {
+            const saved = localStorage.getItem('venestock_license');
+            if (saved) {
+                try {
+                    const license = JSON.parse(saved);
+                    if (license.expiration_date) {
+                        const expDate = new Date(license.expiration_date);
+                        if (expDate <= new Date()) {
+                            localStorage.removeItem('venestock_license');
+                            invoke('validate_license', { status: 'inactive' });
+                            setStatus('unauthorized');
+                            return;
+                        }
+                    }
+                    verifyWithServer(license.key, license.machine_id);
+                } catch (e) {
+                    console.error("Error parsing license for periodic check");
+                }
+            }
+        }, 60000);
+
+        return () => clearInterval(interval);
     }, []);
 
     const getMachineId = async () => {
@@ -41,14 +65,26 @@ export function LicenseGuard({ children }: { children: React.ReactNode }) {
                 return;
             }
 
-            await invoke('init_database', { 
-                url: license.turso_url || null, 
-                token: license.turso_token || null 
+            if (license.expiration_date) {
+                const expDate = new Date(license.expiration_date);
+                console.log(expDate);
+                console.log(new Date());
+                if (expDate < new Date()) {
+                    localStorage.removeItem('venestock_license');
+                    await invoke('validate_license', { status: 'inactive' });
+                    setStatus('unauthorized');
+                    return;
+                }
+            }
+
+            await invoke('init_database', {
+                url: license.turso_url || null,
+                token: license.turso_token || null
             });
 
             setStatus('authorized');
             await invoke('validate_license', { status: 'active' });
-            
+
             verifyWithServer(license.key, machineId);
         } catch (e) {
             await invoke('validate_license', { status: 'inactive' });
@@ -66,9 +102,16 @@ export function LicenseGuard({ children }: { children: React.ReactNode }) {
 
             const doc = response.documents[0];
             
+            if (!doc || doc.status !== 'active' || doc.machine_id !== machineId) {
+                localStorage.removeItem('venestock_license');
+                await invoke('validate_license', { status: 'inactive' });
+                setStatus('unauthorized');
+                return;
+            }
+
             if (doc.expiration_date) {
                 const expDate = new Date(doc.expiration_date);
-                if (expDate < new Date()) {
+                if (expDate <= new Date()) {
                     localStorage.removeItem('venestock_license');
                     await invoke('validate_license', { status: 'inactive' });
                     setStatus('unauthorized');
@@ -76,17 +119,21 @@ export function LicenseGuard({ children }: { children: React.ReactNode }) {
                 }
             }
 
-            if (!doc || doc.status !== 'active' || doc.machine_id !== machineId) {
-                localStorage.removeItem('venestock_license');
-                await invoke('validate_license', { status: 'inactive' });
-                setStatus('unauthorized');
-            } else {
-                // Actualizar rol en local por si cambió en el servidor
-                const saved = JSON.parse(localStorage.getItem('venestock_license') || '{}');
-                if (saved.role !== doc.role) {
-                    saved.role = doc.role || 'ADMIN';
-                    localStorage.setItem('venestock_license', JSON.stringify(saved));
-                }
+            // Actualizar rol y fecha en local por si cambió en el servidor
+            const saved = JSON.parse(localStorage.getItem('venestock_license') || '{}');
+            let updated = false;
+            
+            if (saved.role !== doc.role) {
+                saved.role = doc.role || 'ADMIN';
+                updated = true;
+            }
+            if (saved.expiration_date !== doc.expiration_date) {
+                saved.expiration_date = doc.expiration_date;
+                updated = true;
+            }
+            
+            if (updated) {
+                localStorage.setItem('venestock_license', JSON.stringify(saved));
             }
         } catch (e) {
             console.warn("Could not verify license with server, using offline mode.");
@@ -98,7 +145,7 @@ export function LicenseGuard({ children }: { children: React.ReactNode }) {
         setError('');
         try {
             const machineId = await getMachineId();
-            
+
             const response = await databases.listDocuments(
                 APPWRITE_CONFIG.databaseId,
                 APPWRITE_CONFIG.collectionId,
@@ -110,6 +157,11 @@ export function LicenseGuard({ children }: { children: React.ReactNode }) {
             if (!doc) throw new Error("Llave de producto no válida.");
             if (doc.status !== 'active') throw new Error("Esta licencia ha sido desactivada.");
             if (doc.machine_id && doc.machine_id !== machineId) throw new Error("Esta licencia ya está vinculada a otro equipo.");
+
+            if (doc.expiration_date) {
+                const expDate = new Date(doc.expiration_date);
+                if (expDate < new Date()) throw new Error("Esta licencia ha expirado.");
+            }
 
             if (!doc.machine_id) {
                 await databases.updateDocument(
@@ -125,16 +177,17 @@ export function LicenseGuard({ children }: { children: React.ReactNode }) {
                 owner_name: doc.owner_name,
                 machine_id: machineId,
                 status: 'active',
-                role: doc.role || 'ADMIN', // <-- CAPTURAMOS EL ROL
+                role: doc.role || 'ADMIN',
                 turso_url: doc.turso_db_url,
-                turso_token: doc.turso_auth_token
+                turso_token: doc.turso_auth_token,
+                expiration_date: doc.expiration_date
             };
 
             localStorage.setItem('venestock_license', JSON.stringify(licenseData));
-            
-            await invoke('init_database', { 
-                url: doc.turso_db_url || null, 
-                token: doc.turso_auth_token || null 
+
+            await invoke('init_database', {
+                url: doc.turso_db_url || null,
+                token: doc.turso_auth_token || null
             });
 
             await invoke('validate_license', { status: 'active' });
@@ -163,7 +216,7 @@ export function LicenseGuard({ children }: { children: React.ReactNode }) {
                         <div className="w-20 h-20 bg-primary/10 rounded-3xl mx-auto flex items-center justify-center text-primary">
                             <ShieldAlert size={40} />
                         </div>
-                        
+
                         <div className="space-y-2">
                             <h2 className="text-2xl font-black">Activar VeneStock</h2>
                             <p className="text-muted-foreground text-sm leading-relaxed">
@@ -198,7 +251,7 @@ export function LicenseGuard({ children }: { children: React.ReactNode }) {
                             </button>
                         </div>
                     </div>
-                    
+
                     <div className="p-6 bg-secondary/10 border-t border-border text-center">
                         <p className="text-xs text-muted-foreground">
                             ¿Problemas con tu licencia? <a href="https://www.linkedin.com/in/nelson-portillo/" target="_blank" className="text-primary font-bold hover:underline">Soporte</a>
