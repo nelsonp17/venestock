@@ -4,17 +4,21 @@ from appwrite.client import Client
 from appwrite.services.databases import Databases
 from appwrite.query import Query
 from datetime import datetime, timedelta
+from dotenv import load_dotenv
+import os
 
-# --- CONFIGURACIÓN ---
-PROJECT_ID = '69ab0d85002721c4effc'
-API_KEY = 'standard_bf29d84ab40b09d176f7cfd432f5f82ce9e76d797bf804e2d1d89d07b79db0ecd893f72043e4d334eaa3df803295ffc71cf4fb60cfd6c20a89baa0b6cc3620a9ff5754c7e88ba1b286c92ffba8dbd66b7dcce39985bd22c76a0122a811e5721ac79a36a8c86655fb2dc29eeddeb340738e619aac6937b4ef2c83b51eacce2361'
-DATABASE_ID = '69ab0f140034a79ea5b7'
-COLLECTION_ID = 'venestock'
-ENV_COLLECTION_ID = 'venestock_env'
-# ---------------------
+
+# Cargar variables desde el archivo .env
+load_dotenv() 
+
+PROJECT_ID = os.getenv('VITE_APPWRITE_PROJECT_ID')
+API_KEY = os.getenv('APPWRITE_API_KEY')
+DATABASE_ID = os.getenv('VITE_APPWRITE_DATABASE_ID')
+COLLECTION_ID = os.getenv('VITE_APPWRITE_COLLECTION_ID')
+ENDPOINT = os.getenv('VITE_APPWRITE_ENDPOINT')
 
 client = Client()
-client.set_endpoint('https://nyc.cloud.appwrite.io/v1')
+client.set_endpoint(ENDPOINT)
 client.set_project(PROJECT_ID)
 client.set_key(API_KEY)
 
