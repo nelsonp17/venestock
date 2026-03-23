@@ -1,0 +1,61 @@
+No te preocupes, la mayoría de los desarrolladores preferimos escribir código que hablar frente a una cámara. Para que
+  el video quede profesional y no tengas que preocuparte por la elocuencia, te sugiero la "Técnica del Guion con Voz de
+  IA".
+
+  Aquí tienes un plan paso a paso y un guion listo para usar:
+
+  1. Las herramientas recomendadas
+   * Para grabar pantalla: OBS Studio (https://obsproject.com/) (Gratis) o simplemente la barra de juegos de Windows
+     (Win + Alt + R).
+   * Para la voz (Si no quieres hablar): Usa ElevenLabs o Clipchamp (viene en Windows 11). Tienen voces en español muy
+     naturales que te harán sonar como un locutor profesional.
+   * Para editar: CapCut Desktop. Es muy intuitivo y permite poner subtítulos automáticos.
+
+  2. Estructura del Video (3 Minutos)
+  No intentes improvisar. Sigue este orden basado en tu content_marketing.md:
+
+   1. El Gancho (0:00-0:20): El problema de la tasa del dólar.
+   2. La Solución (0:20-0:40): Presentación de VeneStock.
+   3. Funciones Clave (0:40-2:30): Tasa BCV, Inventario y el POS (lo más importante).
+   4. Cierre (2:30-3:00): Licencia y contacto.
+
+  ---
+
+  3. Guion Sugerido (Puedes copiar y pegar en una IA de voz)
+
+  Introducción:
+  > "¿Cansado de pelear con la tasa del dólar cada vez que vas a cobrar? Gestionar un negocio en Venezuela no tiene por
+  qué ser un caos de calculadoras y hojas de Excel desactualizadas. Te presento VeneStock, el sistema administrativo
+  diseñado para nuestra realidad económica."
+
+  Demostración de la Tasa:
+  > "Lo primero que notarás es la automatización. Con un solo clic, el sistema se conecta al Banco Central de Venezuela
+  y actualiza la tasa oficial. Todos tus precios en bolívares se recalculan al instante basándose en tu margen en
+  dólares. Cero errores, cero pérdidas."
+
+  Módulo POS (Punto de Venta):
+  > "Mira la velocidad de nuestro punto de venta. Está optimizado para que no tengas que tocar el mouse. Escaneas el
+  producto, el sistema calcula el total en ambas monedas y permite pagos mixtos: ¿5 dólares en efectivo y el resto por
+  pago móvil? VeneStock te da el cambio exacto en segundos."
+
+  Inventario y Reportes:
+  > "Además, tienes control total de tu stock, categorías y reportes profesionales en PDF o Excel. Lo mejor de todo: tus
+  datos son tuyos. No hay mensualidades infinitas; la base de datos reside en tu equipo, garantizando privacidad y
+  velocidad."
+
+  Cierre:
+  > "Profesionaliza tu negocio hoy mismo con VeneStock. Rápido, robusto y confiable. Escríbenos para una demostración
+  personalizada."
+
+  ---
+
+  4. Consejos para que quede genial:
+   1. Graba primero, pon la voz después: No intentes grabar y hablar al mismo tiempo. Graba tu pantalla haciendo las
+      acciones lentamente y luego pon la pista de voz encima.
+   2. Zoom en los detalles: En el editor, haz un poco de zoom cuando muestres cosas pequeñas como el precio recalculado
+      o la tasa del BCV.
+   3. Música de fondo: Pon una pista de música "Lo-fi" o "Corporate Tech" a volumen muy bajo (al 10% de volumen). Eso
+      rellena los silencios y hace que el video se sienta "vivo".
+
+  ¿Quieres que te ayude a redactar algún otro segmento específico, como la parte de cómo funciona la sincronización con
+  la nube?

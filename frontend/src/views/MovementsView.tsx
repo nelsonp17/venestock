@@ -65,7 +65,7 @@ export function MovementsView({ active, onNavigateToFacturas }: { active?: boole
         return p ? p.nombre : "Producto desconocido";
     };
 
-    const getFacturaInfo = (id: number | null) => {
+    const getFacturaInfo = (id: number | null | undefined) => {
         if (!id) return null;
         const f = facturas.find(fac => fac.id === id);
         return f || null;

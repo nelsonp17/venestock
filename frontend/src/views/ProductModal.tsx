@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { X, Save, HelpCircle, Info } from "lucide-react";
+import { X, Save, HelpCircle, Info, Barcode } from "lucide-react";
 import { Producto } from "../types";
 import { SearchableSelect, SelectOption } from "../components/SearchableSelect";
 import { generateBarcode } from "../lib/utils";
@@ -17,6 +17,7 @@ interface Categoria { id: number; nombre: string; }
 interface Subcategoria { id: number; nombre: string; categoria_id: number; }
 
 export function ProductModal({ isOpen, onClose, onSave, product }: ProductModalProps) {
+    const barcodeRef = useRef<HTMLInputElement>(null);
     const [formData, setFormData] = useState<Producto>({
         id: null,
         codigo: "",
@@ -86,6 +87,10 @@ export function ProductModal({ isOpen, onClose, onSave, product }: ProductModalP
                 unidad: "UNID",
                 price_per_dolar: tasa
             });
+            // Autofocus on barcode field for new products
+            if (isOpen) {
+                setTimeout(() => barcodeRef.current?.focus(), 100);
+            }
         }
     }, [product, isOpen, tasa]);
 
@@ -109,14 +114,12 @@ export function ProductModal({ isOpen, onClose, onSave, product }: ProductModalP
     };
 
     const handleCategoriaChange = (val: string) => {
-        // When category changes, clear subcategory
         setFormData({ ...formData, categoria: val, subcategoria: "" });
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            // Aplicar redondeo inteligente al stock basado en la unidad
             let cleanStock = parseFloat(formData.stock.toString()) || 0;
             const isUnit = formData.unidad.toUpperCase() === "UNID" || formData.unidad.toUpperCase() === "PAQ" || formData.unidad.toUpperCase() === "PZA";
 
@@ -132,12 +135,17 @@ export function ProductModal({ isOpen, onClose, onSave, product }: ProductModalP
                 precio_ref_usd: typeof formData.precio_ref_usd === 'string' ? (parseFloat(formData.precio_ref_usd) || 0) : formData.precio_ref_usd
             };
 
-            // Autogenerate barcode if missing
+            // LÓGICA INTELIGENTE DE CÓDIGOS
+            // 1. Si no hay código de barras, generamos uno interno para etiquetas
             if (!finalData.barras) {
                 finalData.barras = generateBarcode("750", "001");
             }
+            
+            // 2. Si no hay código interno (nombre corto) pero sí de barras (escaneado), usamos el de barras como interno
+            if (!finalData.codigo) {
+                finalData.codigo = finalData.barras;
+            }
 
-            // Ensure price in Bs is calculated with latest tasa before saving
             finalData.precio_bs = parseFloat((finalData.precio_ref_usd * tasa).toFixed(2));
             finalData.price_per_dolar = tasa;
 
@@ -184,42 +192,41 @@ export function ProductModal({ isOpen, onClose, onSave, product }: ProductModalP
                                 <div className="space-y-3 text-sm">
                                     <p className="font-bold text-primary italic">Instrucciones de Inventario:</p>
                                     <ul className="space-y-2 text-muted-foreground leading-relaxed">
-                                        <li>• <span className="text-foreground font-semibold">Código:</span> Código único del producto.</li>
-                                        <li>• <span className="text-foreground font-semibold">Nombre:</span> Nombre del producto.</li>
-                                        <li>• <span className="text-foreground font-semibold">Precio Ref ($):</span> Es el precio base en dólares. El sistema lo usará para calcular el precio en Bolívares usando la tasa actual (BCV o manual), sería el precio al que vendes el producto.</li>
-                                        <li>• <span className="text-foreground font-semibold">Stock Inicial:</span> La cantidad física que tienes ahora.</li>
-                                        <li>• <span className="text-foreground font-semibold">
-                                            Unidad:</span> Elige <b>KG</b> para productos pesados, <b>G</b> para gramos, <b>UNID</b> para piezas individuales, <b>MT</b> para toneladas, <b>L</b> para litros, <b>ML</b> para mililitros, <b>PAQ</b> para paquetes
-                                            , <b>BULT</b> para bultos (Se asocia generalmente a productos en sacos o bolsas), <b>PACA</b> para pacas (Se refiere específicamente a un conjunto de unidades individuales empaquetadas y pesadas de fabrica). Esto define cómo se restará el stock en movimientos.</li>
+                                        <li>• <span className="text-foreground font-semibold">Código de Barras:</span> Escanea el código del fabricante aquí. Si lo dejas vacío, el sistema generará uno automático.</li>
+                                        <li>• <span className="text-foreground font-semibold">Código Interno:</span> Identificador corto. Si lo dejas vacío, se usará el código de barras.</li>
+                                        <li>• <span className="text-foreground font-semibold">Nombre:</span> Nombre del producto (ej. Arroz Mary 1kg).</li>
+                                        <li>• <span className="text-foreground font-semibold">Precio Ref ($):</span> Precio de venta en dólares.</li>
+                                        <li>• <span className="text-foreground font-semibold">Stock Inicial:</span> Cantidad física disponible.</li>
                                     </ul>
-                                    <div className="bg-white/80 p-3 rounded-xl border border-primary/10 shadow-sm">
-                                        <p className="text-[10px] font-black uppercase text-primary mb-1">Nota:</p>
-                                        <p className="text-xs italic">
-                                            A modo de ejemplo, un producto empaquetado de fabrica como "Harina Pan (1kg)" se mide en <b>UNID</b> y el stock inicial es la cantidad de paquetes que tienes, pero si quieres vender el bulto de Harina Pan (1kg) que trae 24 unidades, debes registrarlo como <b>PACA</b>.
-                                            Ejemplo clásico: Un Bulto de Azúcar de 50kg o un Bulto de Alimento para perros
-                                        </p>
-                                    </div>
-                                    <div className="bg-white/80 p-3 rounded-xl border border-primary/10 shadow-sm">
-                                        <p className="text-[10px] font-black uppercase text-primary mb-1">Ejemplo de registro:</p>
-                                        <p className="text-xs italic">
-                                            "Registro <b>Jamón de Espalda</b> con precio de <b>$1.00</b> y unidad <b>KG</b>. Si tengo una pieza de 5kg, pongo stock inicial <b>5</b>. Luego en movimientos podré vender fracciones como <b>0.45kg</b>."
-                                        </p>
-                                    </div>
                                 </div>
                             </div>
                         </div>
                     )}
 
                     <form onSubmit={handleSubmit} className="p-6 space-y-6">
-                        <div className="space-y-2">
-                            <label className="text-sm font-semibold">Código Interno</label>
-                            <input
-                                required
-                                value={formData.codigo}
-                                onChange={e => setFormData({ ...formData, codigo: e.target.value })}
-                                className="w-full px-4 py-2 border border-border rounded-xl focus:ring-2 focus:ring-primary/20 outline-none"
-                                placeholder="PROD-001"
-                            />
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-sm font-semibold flex items-center space-x-2">
+                                    <Barcode size={14} className="text-primary" />
+                                    <span>Código de Barras</span>
+                                </label>
+                                <input
+                                    ref={barcodeRef}
+                                    value={formData.barras}
+                                    onChange={e => setFormData({ ...formData, barras: e.target.value })}
+                                    className="w-full px-4 py-2 border border-border rounded-xl focus:ring-2 focus:ring-primary/20 outline-none font-mono"
+                                    placeholder="Escanea el código aquí..."
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-semibold text-muted-foreground">Código Interno (Opcional)</label>
+                                <input
+                                    value={formData.codigo}
+                                    onChange={e => setFormData({ ...formData, codigo: e.target.value })}
+                                    className="w-full px-4 py-2 border border-border rounded-xl focus:ring-2 focus:ring-primary/20 outline-none"
+                                    placeholder="Ej. HAR-PAN"
+                                />
+                            </div>
                         </div>
 
                         <div className="space-y-2">
@@ -314,4 +321,3 @@ export function ProductModal({ isOpen, onClose, onSave, product }: ProductModalP
         </div>
     );
 }
-

@@ -1,13 +1,28 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import obfuscator from 'vite-plugin-javascript-obfuscator';
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
-export default defineConfig(async () => ({
-  plugins: [react(), tailwindcss()],
+export default defineConfig(async ({ command }) => ({
+  plugins: [
+    react(), 
+    tailwindcss(),
+    command === 'build' && obfuscator({
+      compact: true,
+      controlFlowFlattening: true,
+      controlFlowFlatteningThreshold: 0.75,
+      numbersToExpressions: true,
+      simplify: true,
+      stringArrayThreshold: 0.75,
+      splitStrings: true,
+      splitStringsChunkLength: 10,
+      unicodeEscapeSequence: false
+    })
+  ],
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //

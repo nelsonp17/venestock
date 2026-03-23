@@ -15,8 +15,6 @@ export function LicenseGuard({ children }: { children: React.ReactNode }) {
     }, []);
 
     const getMachineId = async () => {
-        // Obtenemos un ID único usando comandos de sistema vía Tauri
-        // En Windows usaremos el serial de la placa base o el UUID del sistema
         try {
             const id = await invoke('get_machine_id') as string;
             return id.trim();
@@ -43,11 +41,17 @@ export function LicenseGuard({ children }: { children: React.ReactNode }) {
                 return;
             }
 
+            await invoke('init_database', { 
+                url: license.turso_url || null, 
+                token: license.turso_token || null 
+            });
+
             setStatus('authorized');
+            await invoke('validate_license', { status: 'active' });
             
-            // Verificación silenciosa en segundo plano contra Appwrite
             verifyWithServer(license.key, machineId);
         } catch (e) {
+            await invoke('validate_license', { status: 'inactive' });
             setStatus('unauthorized');
         }
     };
@@ -62,23 +66,29 @@ export function LicenseGuard({ children }: { children: React.ReactNode }) {
 
             const doc = response.documents[0];
             
-            // Validar Expiración
             if (doc.expiration_date) {
                 const expDate = new Date(doc.expiration_date);
                 if (expDate < new Date()) {
                     localStorage.removeItem('venestock_license');
+                    await invoke('validate_license', { status: 'inactive' });
                     setStatus('unauthorized');
                     return;
                 }
             }
 
             if (!doc || doc.status !== 'active' || doc.machine_id !== machineId) {
-                // Si la licencia fue revocada o cambiada, cerramos sesión
                 localStorage.removeItem('venestock_license');
+                await invoke('validate_license', { status: 'inactive' });
                 setStatus('unauthorized');
+            } else {
+                // Actualizar rol en local por si cambió en el servidor
+                const saved = JSON.parse(localStorage.getItem('venestock_license') || '{}');
+                if (saved.role !== doc.role) {
+                    saved.role = doc.role || 'ADMIN';
+                    localStorage.setItem('venestock_license', JSON.stringify(saved));
+                }
             }
         } catch (e) {
-            // Si no hay internet, confiamos en la licencia local
             console.warn("Could not verify license with server, using offline mode.");
         }
     };
@@ -97,19 +107,10 @@ export function LicenseGuard({ children }: { children: React.ReactNode }) {
 
             const doc = response.documents[0];
 
-            if (!doc) {
-                throw new Error("Llave de producto no válida.");
-            }
+            if (!doc) throw new Error("Llave de producto no válida.");
+            if (doc.status !== 'active') throw new Error("Esta licencia ha sido desactivada.");
+            if (doc.machine_id && doc.machine_id !== machineId) throw new Error("Esta licencia ya está vinculada a otro equipo.");
 
-            if (doc.status !== 'active') {
-                throw new Error("Esta licencia ha sido desactivada.");
-            }
-
-            if (doc.machine_id && doc.machine_id !== machineId) {
-                throw new Error("Esta licencia ya está vinculada a otro equipo.");
-            }
-
-            // Vincular licencia si es nueva
             if (!doc.machine_id) {
                 await databases.updateDocument(
                     APPWRITE_CONFIG.databaseId,
@@ -123,13 +124,23 @@ export function LicenseGuard({ children }: { children: React.ReactNode }) {
                 key: doc.key,
                 owner_name: doc.owner_name,
                 machine_id: machineId,
-                status: 'active'
+                status: 'active',
+                role: doc.role || 'ADMIN', // <-- CAPTURAMOS EL ROL
+                turso_url: doc.turso_db_url,
+                turso_token: doc.turso_auth_token
             };
 
             localStorage.setItem('venestock_license', JSON.stringify(licenseData));
+            
+            await invoke('init_database', { 
+                url: doc.turso_db_url || null, 
+                token: doc.turso_auth_token || null 
+            });
+
+            await invoke('validate_license', { status: 'active' });
             setStatus('authorized');
         } catch (e: any) {
-            setError(e.message || "Error al conectar con el servidor de licencias.");
+            setError(e.message || "Error al activar.");
         } finally {
             setLoading(false);
         }
@@ -156,7 +167,7 @@ export function LicenseGuard({ children }: { children: React.ReactNode }) {
                         <div className="space-y-2">
                             <h2 className="text-2xl font-black">Activar VeneStock</h2>
                             <p className="text-muted-foreground text-sm leading-relaxed">
-                                Ingresa la llave de producto que recibiste al adquirir el software para comenzar a usarlo.
+                                Ingresa la llave de producto que recibiste al adquirir el software.
                             </p>
                         </div>
 
@@ -183,21 +194,14 @@ export function LicenseGuard({ children }: { children: React.ReactNode }) {
                                 disabled={loading || !inputKey}
                                 className="w-full bg-primary text-primary-foreground py-4 rounded-xl font-black shadow-lg shadow-primary/20 hover:opacity-90 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
                             >
-                                {loading ? (
-                                    <Loader2 className="animate-spin" size={20} />
-                                ) : (
-                                    <>
-                                        <CheckCircle2 size={20} />
-                                        <span>Activar Ahora</span>
-                                    </>
-                                )}
+                                {loading ? <Loader2 className="animate-spin" size={20} /> : <><CheckCircle2 size={20} /><span>Activar Ahora</span></>}
                             </button>
                         </div>
                     </div>
                     
                     <div className="p-6 bg-secondary/10 border-t border-border text-center">
                         <p className="text-xs text-muted-foreground">
-                            ¿No tienes una licencia? <a href="https://www.linkedin.com/in/nelson-portillo/" target="_blank" className="text-primary font-bold hover:underline">Contactar soporte</a>
+                            ¿Problemas con tu licencia? <a href="https://www.linkedin.com/in/nelson-portillo/" target="_blank" className="text-primary font-bold hover:underline">Soporte</a>
                         </p>
                     </div>
                 </div>

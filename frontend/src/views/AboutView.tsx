@@ -1,8 +1,18 @@
-import { Info, Code, Shield, Mail, ExternalLink, Key, CheckCircle, XCircle } from "lucide-react";
+import { Info, Code, Shield, Mail, ExternalLink, Key, CheckCircle, XCircle, Download, Sparkles } from "lucide-react";
 import { useState, useEffect } from "react";
+import { databases, APPWRITE_CONFIG } from "../lib/appwrite";
+import { Query } from "appwrite";
+import Logo from "/public/tauri.png";
+import packageJson from "../../package.json";
 
 export function AboutView({ active }: { active: boolean }) {
     const [license, setLicense] = useState<any>(null);
+    const [contactLink, setContactLink] = useState("https://www.linkedin.com/in/nelson-portillo/");
+    const [latestVersion, setLatestVersion] = useState(packageJson.version);
+    const [downloadLink, setDownloadLink] = useState("");
+    const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
+
+    const currentVersion = packageJson.version;
 
     useEffect(() => {
         const saved = localStorage.getItem('venestock_license');
@@ -13,27 +23,103 @@ export function AboutView({ active }: { active: boolean }) {
                 console.error("Error parsing license:", e);
             }
         }
-    }, [active]);
+
+        // Fetch dynamic environment variables from Appwrite
+        const fetchEnv = async () => {
+            try {
+                // Fetch contact link
+                const contactRes = await databases.listDocuments(
+                    APPWRITE_CONFIG.databaseId,
+                    APPWRITE_CONFIG.envCollectionId,
+                    [Query.equal("name", "contact_link")]
+                );
+                if (contactRes.total > 0) {
+                    setContactLink(contactRes.documents[0].value);
+                }
+
+                // Fetch version info
+                const versionRes = await databases.listDocuments(
+                    APPWRITE_CONFIG.databaseId,
+                    APPWRITE_CONFIG.envCollectionId,
+                    [Query.equal("name", "latest_version")]
+                );
+                
+                if (versionRes.total > 0) {
+                    const latest = versionRes.documents[0].value;
+                    setLatestVersion(latest);
+                    
+                    // Simple version comparison
+                    if (latest !== currentVersion) {
+                        setIsUpdateAvailable(true);
+                        
+                        // Fetch download link if update available
+                        const linkRes = await databases.listDocuments(
+                            APPWRITE_CONFIG.databaseId,
+                            APPWRITE_CONFIG.envCollectionId,
+                            [Query.equal("name", "latest_version_link")]
+                        );
+                        if (linkRes.total > 0) {
+                            setDownloadLink(linkRes.documents[0].value);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error("Error fetching env data from Appwrite:", error);
+            }
+        };
+
+        if (active) fetchEnv();
+    }, [active, currentVersion]);
 
     if (!active) return null;
 
     return (
         <div className="p-8 max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {/* ... Resto del header ... */}
             <div className="text-center space-y-4 mb-12">
                 <div className="w-24 h-24 bg-primary/10 rounded-3xl mx-auto flex items-center justify-center mb-6 shadow-sm border border-primary/20">
-                    <img src="/public/tauri.png" alt="Logo" className="w-16 h-16 object-contain opacity-80" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                    <img src={Logo} alt="Logo" className="w-16 h-16 object-contain opacity-80" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                 </div>
                 <h2 className="text-4xl font-extrabold tracking-tight">SGM VeneStock</h2>
                 <p className="text-xl text-muted-foreground font-medium">Sistema de Gestión de Inventario</p>
-                <div className="inline-flex items-center space-x-2 bg-secondary/50 px-4 py-1.5 rounded-full border border-border">
-                    <span className="relative flex h-2.5 w-2.5">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
-                    </span>
-                    <span className="text-sm font-semibold tracking-wider text-muted-foreground">V 0.1.0</span>
+                <div className="flex flex-col items-center gap-3">
+                    <div className="inline-flex items-center space-x-2 bg-secondary/50 px-4 py-1.5 rounded-full border border-border">
+                        <span className="relative flex h-2.5 w-2.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+                        </span>
+                        <span className="text-sm font-semibold tracking-wider text-muted-foreground">V {currentVersion}</span>
+                    </div>
+
+                    {isUpdateAvailable && (
+                        <div className="animate-bounce inline-flex items-center gap-2 bg-amber-100 text-amber-700 px-4 py-2 rounded-2xl border border-amber-200 shadow-sm">
+                            <Sparkles size={16} />
+                            <span className="text-xs font-black uppercase tracking-widest">¡Nueva Versión Disponible: {latestVersion}!</span>
+                        </div>
+                    )}
                 </div>
             </div>
+
+            {/* Update Banner */}
+            {isUpdateAvailable && downloadLink && (
+                <div className="bg-amber-50 border-2 border-amber-200 p-6 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-4 shadow-lg shadow-amber-500/5 animate-in zoom-in-95 duration-300">
+                    <div className="flex items-center gap-4 text-center md:text-left">
+                        <div className="w-12 h-12 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-600 shrink-0">
+                            <Download size={24} />
+                        </div>
+                        <div>
+                            <h4 className="text-lg font-bold text-amber-900">Actualización del Sistema</h4>
+                            <p className="text-amber-700/80 text-sm">Hay una versión más reciente disponible para descargar ({latestVersion}). Mejora el rendimiento y añade nuevas funciones.</p>
+                        </div>
+                    </div>
+                    <a
+                        href={downloadLink}
+                        target="_blank"
+                        className="bg-amber-500 hover:bg-amber-600 text-white font-black px-8 py-3 rounded-2xl transition-all shadow-md shadow-amber-500/20 flex items-center gap-2 whitespace-nowrap"
+                    >
+                        Descargar v{latestVersion}
+                    </a>
+                </div>
+            )}
 
             {/* License Information Card */}
             <div className="bg-gradient-to-br from-primary to-primary/80 p-8 rounded-3xl text-white shadow-xl shadow-primary/20 overflow-hidden relative group">
@@ -89,7 +175,6 @@ export function AboutView({ active }: { active: boolean }) {
                         y la experiencia del usuario, permitiendo gestionar el catálogo de productos con tasas multi-divisa (USD/Bs).
                     </p>
                 </div>
-                {/* ... resto de cards (Code, Shield, Mail) ... */}
 
                 {/* Tech Card */}
                 <div className="bg-white p-8 rounded-3xl border border-border shadow-sm hover:shadow-md transition-shadow">
@@ -141,7 +226,7 @@ export function AboutView({ active }: { active: boolean }) {
                         ¿Tienes dudas, sugerencias o necesitas reportar un problema? Ponte en contacto con el equipo de desarrollo.
                     </p>
                     <a
-                        href="https://www.linkedin.com/in/nelson-portillo/"
+                        href={contactLink}
                         target="_blank"
                         className="inline-flex items-center justify-center space-x-2 w-full py-3 bg-white hover:bg-secondary/50 border border-primary/20 text-primary font-bold rounded-xl transition-colors"
                     >

@@ -1,79 +1,76 @@
-use sqlx::{sqlite::SqliteConnectOptions, SqlitePool};
 use std::fs;
 use tauri::{AppHandle, Manager};
-use std::str::FromStr;
+use libsql::{Builder, Database};
+use std::sync::Arc;
+use tokio::time::{sleep, Duration};
 
-pub async fn init_db(app_handle: &AppHandle) -> Result<SqlitePool, Box<dyn std::error::Error>> {
+pub async fn init_db(
+    app_handle: &AppHandle, 
+    turso_url: Option<String>, 
+    turso_token: Option<String>
+) -> Result<Arc<Database>, Box<dyn std::error::Error>> {
     let app_dir = app_handle.path().app_data_dir()?;
     if !app_dir.exists() {
         fs::create_dir_all(&app_dir)?;
     }
     let db_path = app_dir.join("sgm_database.sqlite");
-    
-    let options = SqliteConnectOptions::from_str(&format!("sqlite:{}", db_path.to_str().unwrap()))?
-        .create_if_missing(true);
+    let db_path_str = db_path.to_str().unwrap().to_string();
 
-    let pool = SqlitePool::connect_with(options).await?;
+    let db = if let (Some(url), Some(token)) = (turso_url, turso_token) {
+        // --- CONFIGURACIÓN DE SINCRONIZACIÓN (TURSO) ---
+        let db = Builder::new_remote_replica(&db_path_str, url, token)
+            .build()
+            .await?;
+        
+        let db_arc = Arc::new(db);
+        let db_for_sync = Arc::clone(&db_arc);
+        
+        // Hilo de sincronización en segundo plano
+        tokio::spawn(async move {
+            loop {
+                if let Err(e) = db_for_sync.sync().await {
+                    eprintln!("Error sincronizando con Turso: {}", e);
+                }
+                sleep(Duration::from_secs(30)).await;
+            }
+        });
 
-    // Enable foreign keys
-    sqlx::query("PRAGMA foreign_keys = ON").execute(&pool).await?;
+        // Sincronización inicial
+        let _ = db_arc.sync().await;
+        db_arc
+    } else {
+        // --- MODO LOCAL ÚNICAMENTE ---
+        let db = Builder::new_local(&db_path_str).build().await?;
+        Arc::new(db)
+    };
+
+    let conn = db.connect()?;
 
     // Run migrations (schema)
     let schema = include_str!("../schema.sql");
-    sqlx::query(schema).execute(&pool).await?;
+    conn.execute_batch(schema).await?;
 
-    // Manual migration for price_per_dolar if it doesn't exist
-    let _ = sqlx::query("ALTER TABLE productos ADD COLUMN price_per_dolar REAL NOT NULL DEFAULT 1.0")
-        .execute(&pool)
-        .await;
-
-    let _ = sqlx::query("ALTER TABLE movimientos ADD COLUMN price_per_dolar REAL NOT NULL DEFAULT 1.0")
-        .execute(&pool)
-        .await;
-
-    let _ = sqlx::query("ALTER TABLE productos ADD COLUMN unidad TEXT NOT NULL DEFAULT 'UNID'")
-        .execute(&pool)
-        .await;
-
-    let _ = sqlx::query("ALTER TABLE movimientos ADD COLUMN precio_unitario REAL NOT NULL DEFAULT 0.0")
-        .execute(&pool)
-        .await;
-
-    // Migración para POS: Añadir columna 'tipo' a facturas si no existe
-    let _ = sqlx::query("ALTER TABLE facturas ADD COLUMN tipo TEXT NOT NULL DEFAULT 'COMPRA'")
-        .execute(&pool)
-        .await;
+    // --- MIGRACIONES MANUALES ---
+    let _ = conn.execute("ALTER TABLE productos ADD COLUMN price_per_dolar REAL NOT NULL DEFAULT 1.0", ()).await;
+    let _ = conn.execute("ALTER TABLE movimientos ADD COLUMN price_per_dolar REAL NOT NULL DEFAULT 1.0", ()).await;
+    let _ = conn.execute("ALTER TABLE productos ADD COLUMN unidad TEXT NOT NULL DEFAULT 'UNID'", ()).await;
+    let _ = conn.execute("ALTER TABLE movimientos ADD COLUMN precio_unitario REAL NOT NULL DEFAULT 0.0", ()).await;
+    let _ = conn.execute("ALTER TABLE facturas ADD COLUMN tipo TEXT NOT NULL DEFAULT 'COMPRA'", ()).await;
 
     // Asegurar que existan los métodos de pago iniciales
-    let _ = sqlx::query("INSERT OR IGNORE INTO metodos_pago (nombre) VALUES 
-        ('Efectivo USD'), ('Efectivo BS'), ('Pago Móvil'), ('Zelle'), 
-        ('Punto de Venta'), ('PayPal'), ('BioPago')")
-        .execute(&pool)
-        .await;
+    let metodos = vec![
+        "Efectivo USD", "Efectivo BS", "Pago Móvil", "Zelle", 
+        "Punto de Venta", "PayPal", "BioPago"
+    ];
+    for metodo in metodos {
+        let _ = conn.execute("INSERT OR IGNORE INTO metodos_pago (nombre) VALUES (?)", [metodo]).await;
+    }
 
-    // Eliminar Binance si existía anteriormente
-    let _ = sqlx::query("DELETE FROM metodos_pago WHERE nombre = 'Binance'")
-        .execute(&pool)
-        .await;
+    let _ = conn.execute("DELETE FROM metodos_pago WHERE nombre = 'Binance'", ()).await;
 
-    // Manual migration: create categorias table if it doesn't exist
-    let _ = sqlx::query(
-        "CREATE TABLE IF NOT EXISTS categorias (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nombre TEXT UNIQUE NOT NULL
-        )"
-    ).execute(&pool).await;
+    // Categorias y Subcategorias
+    let _ = conn.execute("CREATE TABLE IF NOT EXISTS categorias (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT UNIQUE NOT NULL)", ()).await;
+    let _ = conn.execute("CREATE TABLE IF NOT EXISTS subcategorias (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT NOT NULL, categoria_id INTEGER NOT NULL, FOREIGN KEY(categoria_id) REFERENCES categorias(id) ON DELETE CASCADE, UNIQUE(nombre, categoria_id))", ()).await;
 
-    // Manual migration: create subcategorias table if it doesn't exist
-    let _ = sqlx::query(
-        "CREATE TABLE IF NOT EXISTS subcategorias (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nombre TEXT NOT NULL,
-            categoria_id INTEGER NOT NULL,
-            FOREIGN KEY(categoria_id) REFERENCES categorias(id) ON DELETE CASCADE,
-            UNIQUE(nombre, categoria_id)
-        )"
-    ).execute(&pool).await;
-
-    Ok(pool)
+    Ok(db)
 }

@@ -31,7 +31,7 @@ export interface Movimiento {
     total_bs: number;
     price_per_dolar: number;
     fecha?: string;
-    factura_id?: number;
+    factura_id?: number | null;
 }
 
 export interface Categoria {

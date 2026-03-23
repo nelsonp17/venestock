@@ -9,4 +9,5 @@ export const databases = new Databases(client);
 export const APPWRITE_CONFIG = {
     databaseId: '69ab0f140034a79ea5b7',
     collectionId: 'venestock',
+    envCollectionId: 'venestock_env',
 };
